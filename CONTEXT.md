@@ -20,3 +20,6 @@ Wartość 0 oznacza zatrzymanie obrotu; dodatnie wartości zachowują jego kieru
 
 **Panel Maxwella**:
 Widok kota obok czatu BB, dostępny przez Actions w istniejącym wątku oraz podczas przygotowywania nowego wątku.
+
+**Muzyka Maxwella**:
+Utwór towarzyszący Maxwellowi, pochodzący z projektu opublikowanego pod adresem https://store.kde.org/p/2274580.
