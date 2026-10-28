@@ -165,13 +165,11 @@ test('every free and capture publishes its target mode, whatever the calling thr
       await call('maxwell_free', {}),
     ];
     assert.deepEqual(commands(host), [{ mode: 'free' }, { mode: 'free' }, { mode: 'panel' }, { mode: 'panel' }, { mode: 'free' }]);
-    for (const result of results) {
-      assert.equal(typeof result, 'string', 'A published command is a success');
-      assert.match(result, /^Sent the (free|capture) command/);
-      assert.match(result, /not confirmed/, 'The result must not claim that any tab displayed the change');
-    }
-    assert.match(results[0], /free/);
-    assert.match(results[2], /capture/);
+    assert.deepEqual(results, [
+      'Maxwell has been freed.', 'Maxwell has been freed.',
+      'Maxwell has been captured.', 'Maxwell has been captured.',
+      'Maxwell has been freed.',
+    ], 'A published command reports only that Maxwell was freed or captured');
     assert.equal(await saved('thr_a'), 24, 'Commands must not change any rotation speed');
   } finally { await lifecycle.dispose(); }
 });
@@ -186,8 +184,7 @@ test('a failed publication is reported as an error, not as a sent command', asyn
     for (const name of MODE_TOOLS) {
       const result = await host.harness.behavior.callAgentTool(name, {}, { threadId: 'thr_a' });
       assert.equal(result.isError, true);
-      assert.match(text(result), /could not be sent/);
-      assert.doesNotMatch(text(result), /^Sent/);
+      assert.match(text(result), /^Maxwell could not be (freed|captured)\.$/);
     }
     failing = false;
     assert.equal(typeof await host.harness.behavior.callAgentTool('maxwell_free', {}, { threadId: 'thr_a' }), 'string');

@@ -63,7 +63,7 @@ test('free and capture reach every connected tab; new and reloaded tabs start in
     const second = await openTab(context, `/threads/${b}`);
     assert.deepEqual(await places(second), { panel: 0, free: 0, panels: 0 });
 
-    assert.match(await callTool(b, 'maxwell_free'), /^Sent the free command/);
+    assert.match(await callTool(b, 'maxwell_free'), /^Maxwell has been freed\.$/);
     await Promise.all([waitForFree(first), waitForFree(second)]);
     assert.deepEqual(await places(first), { panel: 0, free: 1, panels: 1 }, 'The open panel must give its cat up');
     assert.equal(await first.getByRole('region', { name: 'maxwell' }).getByText(FREE).isVisible(), true);
@@ -92,7 +92,7 @@ test('free and capture reach every connected tab; new and reloaded tabs start in
     assert.ok(difference(before.image, after.image) < 0.5, 'A repeated free must not reset the pose');
     await first.evaluate(() => window.maxwellBrowserProbe.resume());
 
-    assert.match(await callTool(a, 'maxwell_capture'), /^Sent the capture command/);
+    assert.match(await callTool(a, 'maxwell_capture'), /^Maxwell has been captured\.$/);
     await Promise.all([waitForPanelMode(first), waitForPanelMode(second), waitForPanelMode(third)]);
     await first.getByRole('region', { name: 'maxwell' }).getByRole('img', { name: CAT }).waitFor();
     assert.deepEqual(await places(first), { panel: 1, free: 0, panels: 1 });
