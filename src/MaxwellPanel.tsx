@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { playMaxwellMusic } from './music';
-import { mountMaxwellScene } from './scene';
+import { mountMaxwellScene, type MaxwellScene } from './scene';
+import { useThreadRpm } from './useThreadRpm';
 
-export function MaxwellPanel() {
+/** Maxwell for a thread, or for New thread when there is no thread yet. */
+export function MaxwellPanel({ threadId = null }: { threadId?: string | null }) {
   const stage = useRef<HTMLDivElement>(null);
+  const scene = useRef<MaxwellScene | null>(null);
+  const rpm = useThreadRpm(threadId);
   const [status, setStatus] = useState<string | null>('Loading Maxwell');
   const [failed, setFailed] = useState(false);
 
@@ -14,12 +18,16 @@ export function MaxwellPanel() {
     canvas.setAttribute('role', 'img');
     canvas.setAttribute('aria-label', 'Maxwell the cat rotating from right to left');
     stage.current!.prepend(canvas);
-    const dispose = mountMaxwellScene(stage.current!, canvas, (message) => {
+    const mounted = mountMaxwellScene(stage.current!, canvas, (message) => {
       setStatus(message);
       setFailed(message !== null);
     }, playMaxwellMusic);
-    return () => { dispose(); canvas.remove(); };
+    scene.current = mounted;
+    return () => { scene.current = null; mounted.dispose(); canvas.remove(); };
   }, []);
+
+  // Hold still until the thread's saved speed is known.
+  useEffect(() => { scene.current?.setRpm(rpm ?? 0); }, [rpm]);
 
   return (
     <section className="maxwell-panel" aria-label="maxwell">

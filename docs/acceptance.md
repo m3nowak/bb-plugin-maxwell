@@ -5,6 +5,8 @@ Actions entries on New thread and an existing thread, the bundled renderer,
 browser graphics calls and rendered pixels. They do not import panel internals.
 
 Run `npm run build`, install or reload `maxwell` in BB, then run `npm test`.
+`tool.test.mjs` loads the built server bundle into the Plugin SDK's fake host
+and calls the registered agent tool as a provider tool call would.
 Set `MAXWELL_BB_URL` for the host and `MAXWELL_THREAD_ID` for an existing thread.
 BB threads supply `BB_SERVER_URL` and `BB_THREAD_ID` as defaults.
 `MAXWELL_CHROME` selects the browser binary. `MAXWELL_CHROME_ARGS` replaces the
@@ -70,6 +72,34 @@ For the 24 rpm rotation and 20-cycle vertical bob update, build and typecheck
 pass, as do the unavailable-WebGL, thrown-draw and package checks. The updated
 rendered-motion check still cannot reach a visible scene on this host.
 
+## Rotation speed tool (issue #3)
+
+`tool.test.mjs` covers the agent tool contract at the SDK host boundary: one
+registered setter exposed without selection rules, the saved rpm returned
+unrounded for 0, 0.5, 240.25 and extreme finite values, the 24 rpm default,
+rejection of missing, negative, non-numeric, non-finite and thread-targeting
+input without a state change, a missing thread identity, an injected save
+failure, thread sharing and isolation, competing saves converging on the last
+saved value and revision, and retention across a plugin reload.
+
+BB's live tool route accepts only authenticated host daemon sessions, so the
+browser suite cannot call the tool directly. One manual live check in BB
+0.47.1 asked a Claude Code agent in a scratch thread to call the installed
+tool with 0.5 rpm. The tool returned `{"rpm":0.5}`, the thread's saved speed
+became 0.5, a browser viewing that thread's panel received the update on the
+thread's channel and a second client viewing another thread kept 24 rpm.
+
+Not verified here:
+
+- Rendered speed: 0.5 rpm taking two minutes per revolution, 60 rpm after
+  opening a panel, angle retention on change, zero rpm with bobbing, and
+  extreme speeds. The rendering limitation above still applies.
+- An actual BB restart and an agent-session reset. Speed is keyed only by
+  thread in BB's plugin storage, and reload retention is tested.
+- Two browser clients converging on competing live changes. The panel keeps
+  the highest revision from its read and from realtime signals, and rereads
+  after every reconnection.
+
 ## Music verification (issue #5)
 
 BB 0.47.1, Plugin SDK 0.6.79, Chromium 150 with hardware ANGLE
@@ -91,4 +121,3 @@ nothing with the default SwiftShader flags.
   panel. The existing-thread check found no "Ask anything." composer in a
   thread with a running turn.
 - Nobody listened to the recording during this verification.
-
