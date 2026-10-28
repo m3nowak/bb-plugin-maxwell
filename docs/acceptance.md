@@ -9,7 +9,7 @@ Set `MAXWELL_BB_URL` for the host and `MAXWELL_THREAD_ID` for an existing thread
 BB threads supply `BB_SERVER_URL` and `BB_THREAD_ID` as defaults.
 
 The suite covers locally bundled assets, missing WebGL, invalid image data,
-context loss, attribution retention, 24 rpm rotation and gentle vertical motion at 20 cycles per minute under both
+context loss, attribution retention, 24 rpm rotation and vertical motion at 20 cycles per minute under both
 motion preferences, framing, theme changes, hidden views and repeated closing.
 Rendering tests fail on unusable graphics hardware, rather than skipping.
 

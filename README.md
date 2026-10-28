@@ -5,7 +5,7 @@ beside your conversation. It also works on **New thread**, before sending a
 message. BB owns the panel tabs, resizing and closing.
 
 Maxwell turns from right to left at 24 rpm, one turn every 2.5 seconds, and
-gently bobs up and down at 20 cycles per minute, one cycle every three seconds.
+bobs up and down at 20 cycles per minute, one cycle every three seconds.
 Both motions continue when the system requests reduced motion. The camera
 stays fixed.
 The scene pauses while the panel or page is hidden and resumes from the same

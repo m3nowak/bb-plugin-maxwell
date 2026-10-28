@@ -18,7 +18,7 @@ import { contentBounds, difference, freeze, sample } from './images.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
 
-test('rendered rotation is 24 rpm with a gentle 20-cycle bob, including reduced motion', async () => {
+test('rendered rotation is 24 rpm with a 20-cycle bob, including reduced motion', async () => {
   for (const reducedMotion of ['no-preference', 'reduce']) {
     const { browser, page } = await openBB({ reducedMotion });
     try {
@@ -59,7 +59,7 @@ test('rendered rotation is 24 rpm with a gentle 20-cycle bob, including reduced 
       const initialCenter = (initialBounds.top + initialBounds.bottom) / 2;
       const oppositeCenter = (oppositeBounds.top + oppositeBounds.bottom) / 2;
       assert.ok(oppositeCenter > initialCenter + 2, 'The cat must visibly bob downward');
-      assert.ok(oppositeCenter - initialCenter < initial.height * 0.1, 'The vertical motion must remain gentle');
+      assert.ok(oppositeCenter - initialCenter < initial.height * 0.3, 'The vertical motion must stay within its expanded range');
       assert.ok(Math.abs(oppositeBounds.left - initialBounds.left) < 3, 'The bob must not move the cat sideways');
       const repeated = await sample(page, 7500);
       assert.ok(difference(initial, repeated) < 0.5, 'Both motions must repeat together after 15 seconds');

@@ -7,7 +7,7 @@ import model from '../assets/maxwell.json';
 
 const TURN_PER_MS = 2 * Math.PI / 2500;
 const BOB_PER_MS = 2 * Math.PI / 3000;
-const BOB_HEIGHT_RATIO = 0.035;
+const BOB_HEIGHT_RATIO = 0.105;
 const ELEVATION = 14 * Math.PI / 180;
 const FOV = 30;
 
