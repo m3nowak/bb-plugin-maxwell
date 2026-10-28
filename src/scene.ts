@@ -5,21 +5,27 @@ import {
 } from 'three';
 import model from '../assets/maxwell.json';
 
-const TURN_PER_MS = 2 * Math.PI / 2500;
+const MS_PER_MINUTE = 60000;
 const BOB_PER_MS = 2 * Math.PI / 3000;
 const BOB_HEIGHT_RATIO = 0.105;
 const ELEVATION = 14 * Math.PI / 180;
 const FOV = 30;
 
+export interface MaxwellScene {
+  /** Change rotation speed from the current angle. 0 stops rotation but not the bob. */
+  setRpm(rpm: number): void;
+  dispose(): void;
+}
+
 /** Owns one visible scene and all of its graphics resources. */
-export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement, report: (message: string | null) => void) {
+export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement, report: (message: string | null) => void): MaxwellScene {
   let renderer: WebGLRenderer;
   try {
     renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
   } catch {
     canvas.hidden = true;
     report('The 3D view needs WebGL, which is not available here.');
-    return () => {};
+    return { setRpm() {}, dispose() {} };
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new Scene();
@@ -39,6 +45,9 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
   let height = 0;
   let running = false;
   let previousTime: number | null = null;
+  let turnsPerMs = 0;
+  // Fraction of a revolution, kept in (-1, 0] so precision does not decay.
+  let turn = 0;
   let bobPhase = 0;
   let bobAmplitude = 0;
 
@@ -46,7 +55,11 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
     if (!running) return;
     if (previousTime !== null) {
       const elapsed = time - previousTime;
-      cat.rotation.y = (cat.rotation.y - elapsed * TURN_PER_MS) % (2 * Math.PI);
+      // Only the fraction of a frame's turns matters. At extreme speeds that
+      // fraction can vanish or the product overflow; keep the angle finite.
+      const turns = elapsed * turnsPerMs;
+      if (Number.isFinite(turns)) turn = (turn - turns % 1) % 1;
+      cat.rotation.y = turn * 2 * Math.PI;
       bobPhase = (bobPhase + elapsed * BOB_PER_MS) % (2 * Math.PI);
       cat.position.y = Math.sin(bobPhase) * bobAmplitude;
     }
@@ -153,5 +166,8 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
     } catch { fail('The Maxwell model could not be loaded. Reopen the panel to try again.'); }
   };
   void load();
-  return dispose;
+  return {
+    setRpm(rpm) { turnsPerMs = rpm / MS_PER_MINUTE; },
+    dispose,
+  };
 }
