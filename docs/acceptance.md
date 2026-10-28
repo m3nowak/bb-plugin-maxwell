@@ -36,7 +36,7 @@ browser scheduling, and repeat with reduced motion enabled.
   retaining credit and stopping graphics calls, decoding attempts and animation
   scheduling. All three attribution links open their expected destinations.
 - The distributable contains both bundles, the original archive, the prepared
-  self-contained model and separate code, model and dependency notices.
+  self-contained model, code license, and model/dependency notices in NOTICE.md.
 - Rendering acceptance remains blocked on this machine. Headless Chromium's
   GPU process loses its graphics context on a minimal shader-drawn triangle,
   including outside BB. Chromium 120, 141 and 156 and both BB's native terminal

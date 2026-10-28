@@ -51,7 +51,6 @@
     "dist",
     "LICENSE",
     "NOTICE.md",
-    "THIRD_PARTY_LICENSES.txt",
     "README.md"
   ],
   "scripts": {
