@@ -1,0 +1,62 @@
+{
+  "name": "bb-plugin-maxwell",
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.47",
+    "bbPluginSdk": ">=0.6.79 <1",
+    "node": ">=22"
+  },
+  "bb": {
+    "name": "maxwell",
+    "description": "Maxwell for bb",
+    "branding": {
+      "icon": "./assets/icon.svg",
+      "experimental_icons": {
+        "cat-head": "./assets/icon.svg"
+      }
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.6.79",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/three": "^0.180.0",
+    "@webgpu/types": "^0.1.74",
+    "hono": "^4.13.14",
+    "playwright": "1.56.1",
+    "pngjs": "^7.0.0",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "typescript": "^5.7.0"
+  },
+  "description": "Maxwell for bb",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/m3nowak/bb-plugin-maxwell.git"
+  },
+  "files": [
+    "server.ts",
+    "app.tsx",
+    "src",
+    "assets",
+    "dist",
+    "LICENSE",
+    "NOTICE.md",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "bb plugin build",
+    "typecheck": "tsc --noEmit",
+    "test": "node --test --test-concurrency=1 tests/acceptance/*.test.mjs",
+    "prepare:model": "node scripts/prepare-model.mjs"
+  }
+}
