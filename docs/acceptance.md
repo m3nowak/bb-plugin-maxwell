@@ -9,11 +9,27 @@ Run `npm run build`, install or reload `maxwell` in BB, then run `npm test`.
 and calls the registered agent tool as a provider tool call would.
 Set `MAXWELL_BB_URL` for the host and `MAXWELL_THREAD_ID` for an existing thread.
 BB threads supply `BB_SERVER_URL` and `BB_THREAD_ID` as defaults.
+`MAXWELL_CHROME` selects the browser binary. `MAXWELL_CHROME_ARGS` replaces the
+default SwiftShader flags, for example with
+`--no-sandbox --use-angle=gl-egl --ignore-gpu-blocklist` for a hardware GPU.
 
 The suite covers locally bundled assets, missing WebGL, invalid image data,
 context loss, attribution retention, 24 rpm rotation and vertical motion at 20 cycles per minute under both
 motion preferences, framing, theme changes, hidden views and repeated closing.
 Rendering tests fail on unusable graphics hardware, rather than skipping.
+
+Music checks observe the browser media boundary: `playing` events, advancing
+positions, rewinds, natural ends and concurrent playback. They click real
+rendered cat pixels found in the frame, at four poses and three panel sizes.
+Background and attribution clicks must stay silent. Repeated clicks while the
+recording starts or plays must not reload, restart, queue or overlap it.
+The recording must play once to its end and replay from the start. Playback
+must continue across panel closing, reopening, a thread change and a lost
+graphics context, with one player for the tab. A failed load and a refused
+play must allow retrying. Tab reload and plugin disable must stop playback and
+release the media without resuming it. The pose and size check substitutes a
+short silent WAV, so each hit is observed as its own complete playback.
+Listen to the bundled recording once to confirm it is the expected music.
 
 Rendered quarter-turn images are written to `artifacts/` by the timing check.
 Review those images in chronological order to verify that the face moves from
@@ -83,3 +99,25 @@ Not verified here:
 - Two browser clients converging on competing live changes. The panel keeps
   the highest revision from its read and from realtime signals, and rereads
   after every reconnection.
+
+## Music verification (issue #5)
+
+BB 0.47.1, Plugin SDK 0.6.79, Chromium 150 with hardware ANGLE
+(`--use-angle=gl-egl --ignore-gpu-blocklist`) on the host's AMD GPU. A minimal
+shader-drawn triangle renders correctly with these flags. It still renders
+nothing with the default SwiftShader flags.
+
+- Build, typecheck and the package check pass. The packed WAV has the issue's
+  SHA-256, and the BB route serves identical bytes from both the source and
+  the built server entry.
+- All five music checks pass, along with the rotation timing, framing,
+  attribution and failure checks.
+- A plugin reload with an unchanged bundle keeps BB's frontend generation, so
+  playback continues by host design. A manual check rebuilt a changed bundle
+  and reloaded it during playback. The old generation stopped and released
+  the recording within a second and did not resume.
+- Two existing checks failed for reasons outside the music. The visibility
+  check found a persisted New thread "New tab" active after re-showing the
+  panel. The existing-thread check found no "Ask anything." composer in a
+  thread with a running turn.
+- Nobody listened to the recording during this verification.

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { playMaxwellMusic } from './music';
 import { mountMaxwellScene, type MaxwellScene } from './scene';
 import { useThreadRpm } from './useThreadRpm';
 
@@ -20,7 +21,7 @@ export function MaxwellPanel({ threadId = null }: { threadId?: string | null }) 
     const mounted = mountMaxwellScene(stage.current!, canvas, (message) => {
       setStatus(message);
       setFailed(message !== null);
-    });
+    }, playMaxwellMusic);
     scene.current = mounted;
     return () => { scene.current = null; mounted.dispose(); canvas.remove(); };
   }, []);

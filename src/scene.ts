@@ -1,7 +1,7 @@
 import {
   BufferGeometryLoader, DirectionalLight, DoubleSide, Group, HemisphereLight,
-  Mesh, MeshLambertMaterial, PerspectiveCamera, Scene, SRGBColorSpace, Texture,
-  WebGLRenderer,
+  Mesh, MeshLambertMaterial, PerspectiveCamera, Raycaster, Scene, SRGBColorSpace,
+  Texture, Vector2, WebGLRenderer,
 } from 'three';
 import model from '../assets/maxwell.json';
 
@@ -10,6 +10,7 @@ const BOB_PER_MS = 2 * Math.PI / 3000;
 const BOB_HEIGHT_RATIO = 0.105;
 const ELEVATION = 14 * Math.PI / 180;
 const FOV = 30;
+const WHISKER_ALPHA_TEST = 0.05;
 
 export interface MaxwellScene {
   /** Change rotation speed from the current angle. 0 stops rotation but not the bob. */
@@ -18,7 +19,12 @@ export interface MaxwellScene {
 }
 
 /** Owns one visible scene and all of its graphics resources. */
-export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement, report: (message: string | null) => void): MaxwellScene {
+export function mountMaxwellScene(
+  stage: HTMLElement,
+  canvas: HTMLCanvasElement,
+  report: (message: string | null) => void,
+  onCatClick: () => void,
+): MaxwellScene {
   let renderer: WebGLRenderer;
   try {
     renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'low-power' });
@@ -50,6 +56,9 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
   let turn = 0;
   let bobPhase = 0;
   let bobAmplitude = 0;
+  let whiskerAlpha: ImageData | undefined;
+  const raycaster = new Raycaster();
+  const pointer = new Vector2();
 
   const frame = (time: number) => {
     if (!running) return;
@@ -99,6 +108,26 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
     }
     updateLoop();
   };
+  // Hit the silhouette as last drawn: the body's front faces, and whisker
+  // texels that survive the same alpha test the renderer applies.
+  const whiskerOpaque = ({ x, y }: Vector2) => {
+    const { width: columns, height: rows, data } = whiskerAlpha!;
+    const column = Math.min(columns - 1, Math.max(0, Math.floor(x * columns)));
+    const row = Math.min(rows - 1, Math.max(0, Math.floor((1 - y) * rows)));
+    return data[(row * columns + column) * 4 + 3] / 255 >= WHISKER_ALPHA_TEST;
+  };
+  const click = (event: MouseEvent) => {
+    if (disposed || !ready) return;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, (rect.top - event.clientY) / rect.height * 2 + 1);
+    // A resize can reframe the camera before the next frame is drawn.
+    scene.updateMatrixWorld();
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObject(cat);
+    if (hits.some(({ face, uv }) => face?.materialIndex === 0 || (uv !== undefined && whiskerOpaque(uv)))) onCatClick();
+  };
   const sizeObserver = new ResizeObserver(resize);
   const visibilityObserver = new IntersectionObserver((entries) => {
     inView = entries[entries.length - 1].isIntersecting;
@@ -114,6 +143,7 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
     document.removeEventListener('visibilitychange', updateLoop);
     window.removeEventListener('pagehide', dispose);
     canvas.removeEventListener('webglcontextlost', contextLost);
+    canvas.removeEventListener('click', click);
     geometry?.dispose();
     for (const material of materials) material.dispose();
     for (const texture of textures) texture.dispose();
@@ -131,6 +161,7 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
     fail('The 3D view stopped because the graphics device was reset. Reopen the panel to try again.');
   };
   canvas.addEventListener('webglcontextlost', contextLost);
+  canvas.addEventListener('click', click);
   document.addEventListener('visibilitychange', updateLoop);
   window.addEventListener('pagehide', dispose);
   sizeObserver.observe(stage);
@@ -148,6 +179,12 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
         return image;
       }));
       if (disposed) return;
+      const whiskers = images[1];
+      const sampler = document.createElement('canvas').getContext('2d', { willReadFrequently: true })!;
+      sampler.canvas.width = whiskers.naturalWidth;
+      sampler.canvas.height = whiskers.naturalHeight;
+      sampler.drawImage(whiskers, 0, 0);
+      whiskerAlpha = sampler.getImageData(0, 0, whiskers.naturalWidth, whiskers.naturalHeight);
       for (const image of images) {
         const texture = new Texture(image);
         texture.colorSpace = SRGBColorSpace;

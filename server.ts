@@ -1,5 +1,6 @@
 import { defineRpcContract, type BbPluginApi, type PluginAgentToolResult } from '@get-bb/plugin-sdk';
 import { z } from 'zod';
+import { serveMaxwellMusic } from './src/musicRoute';
 import { DEFAULT_SPEED, isThreadSpeed, speedChannel, type ThreadSpeed } from './src/speed';
 
 export const TOOL_NAME = 'maxwell_set_rotation_speed';
@@ -15,6 +16,8 @@ const failure = (text: string): PluginAgentToolResult => ({ content: [{ type: 't
 
 /** Owns each thread's persistent rotation speed, shared by the thread's agents. */
 export default function maxwell(bb: BbPluginApi) {
+  serveMaxwellMusic(bb);
+
   const key = (threadId: string) => `speed/${threadId}`;
   const read = async (threadId: string): Promise<ThreadSpeed> => {
     const saved = await bb.storage.kv.get<unknown>(key(threadId));

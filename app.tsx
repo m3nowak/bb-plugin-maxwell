@@ -1,5 +1,6 @@
 import { definePluginApp } from '@get-bb/plugin-sdk/app';
 import { MaxwellPanel } from './src/MaxwellPanel';
+import { mountMaxwellMusic } from './src/music';
 import './src/panel.css';
 
 export default definePluginApp((app) => {
@@ -18,4 +19,6 @@ export default definePluginApp((app) => {
   });
   // Before a thread exists there is no saved speed to follow.
   app.slots.experimental_newThreadPanelAction({ ...panel, component: () => <MaxwellPanel /> });
+  // One player per BB tab, outliving panels, threads and scenes.
+  app.contentScripts.register({ id: 'music', mount: mountMaxwellMusic });
 });
