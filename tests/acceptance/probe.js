@@ -89,5 +89,43 @@
       window.requestAnimationFrame(callback);
     }
   };
+  // Observe media through browser playback events, not the player's code.
+  // A play() call alone is not evidence: only `playing` and advancing
+  // `timeupdate` positions count as sound.
+  const media = new Map();
+  probe.audio = { starts: 0, ends: 0, rewinds: 0, maxConcurrent: 0, errors: 0 };
+  const observe = (element) => {
+    if (media.has(element)) return;
+    const record = { element, position: 0 };
+    media.set(element, record);
+    element.addEventListener('playing', () => {
+      if (element.currentTime < 0.25) probe.audio.starts++;
+      record.position = element.currentTime;
+      const playing = [...media.keys()].filter((item) => !item.paused && !item.ended).length;
+      probe.audio.maxConcurrent = Math.max(probe.audio.maxConcurrent, playing);
+    });
+    element.addEventListener('timeupdate', () => {
+      if (element.currentTime + 0.05 < record.position && !element.paused) probe.audio.rewinds++;
+      record.position = element.currentTime;
+    });
+    element.addEventListener('ended', () => { probe.audio.ends++; record.position = 0; });
+    element.addEventListener('emptied', () => { record.position = 0; });
+    element.addEventListener('error', () => probe.audio.errors++);
+  };
+  const play = HTMLMediaElement.prototype.play;
+  HTMLMediaElement.prototype.play = function (...args) {
+    observe(this);
+    return play.apply(this, args);
+  };
+  probe.media = () => [...media.keys()].map((element) => ({
+    src: element.currentSrc,
+    currentTime: element.currentTime,
+    duration: element.duration,
+    paused: element.paused,
+    ended: element.ended,
+    networkState: element.networkState,
+    readyState: element.readyState,
+  }));
+  probe.audible = () => [...media.keys()].filter((element) => !element.paused && !element.ended && element.currentTime > 0).length;
   window.maxwellBrowserProbe = probe;
 })();

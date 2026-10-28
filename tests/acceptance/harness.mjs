@@ -7,7 +7,8 @@ export async function openBB(options = {}) {
     executablePath: process.env.MAXWELL_CHROME,
     headless: true,
     env: { ...process.env, LIBGL_ALWAYS_SOFTWARE: '1' },
-    args: ['--no-sandbox', '--disable-features=Vulkan', '--disable-gpu-compositing', '--disable-gpu-sandbox', '--use-gl=angle', '--use-angle=swiftshader-webgl', '--enable-unsafe-swiftshader'],
+    args: process.env.MAXWELL_CHROME_ARGS?.split(' ').filter(Boolean)
+      ?? ['--no-sandbox', '--disable-features=Vulkan', '--disable-gpu-compositing', '--disable-gpu-sandbox', '--use-gl=angle', '--use-angle=swiftshader-webgl', '--enable-unsafe-swiftshader'],
   });
   try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, ...options });
@@ -32,4 +33,12 @@ export async function openMaxwell(page, { expectRendering = true } = {}) {
     .and(page.getByTitle('maxwell', { exact: true })).click();
   await page.getByRole('region', { name: 'maxwell', exact: true }).waitFor();
   if (expectRendering) await page.getByRole('img', { name: 'Maxwell the cat rotating from right to left' }).waitFor();
+}
+
+export async function closeMaxwell(page) {
+  // The close control only accepts pointer events while its tab is hovered.
+  const close = page.getByRole('button', { name: 'Close maxwell', exact: true });
+  const box = await close.boundingBox();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await close.click();
 }

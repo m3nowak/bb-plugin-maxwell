@@ -1,4 +1,6 @@
 import type { BbPluginApi } from '@get-bb/plugin-sdk';
+import { serveMaxwellMusic } from './src/musicRoute';
 
-// The required server entry has no services, settings, storage or network work.
-export default function maxwell(_bb: BbPluginApi) {}
+export default function maxwell(bb: BbPluginApi) {
+  serveMaxwellMusic(bb);
+}

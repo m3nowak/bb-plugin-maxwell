@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { playMaxwellMusic } from './music';
 import { mountMaxwellScene } from './scene';
 
 export function MaxwellPanel() {
@@ -16,7 +17,7 @@ export function MaxwellPanel() {
     const dispose = mountMaxwellScene(stage.current!, canvas, (message) => {
       setStatus(message);
       setFailed(message !== null);
-    });
+    }, playMaxwellMusic);
     return () => { dispose(); canvas.remove(); };
   }, []);
 

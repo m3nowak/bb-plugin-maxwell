@@ -38,6 +38,21 @@ are edited. Rotation is applied around the normalized vertical axis.
 The panel displays creator, source and license credit below the scene, including
 when rendering fails. This notice records the modifications.
 
+# Music
+
+assets/stockmarket.wav is the recording from the Maxwell project on the KDE
+Store, which also inspired this plugin.
+
+- Project: https://store.kde.org/p/2274580
+- Source repository: https://github.com/wilversings/maxwell
+- File: https://raw.githubusercontent.com/wilversings/maxwell/91919502b7934cddc9ca383cc285414dc7cb140b/contents/ui/assets/stockmarket.wav
+- SHA-256: f116ce27fc4b793b37ae80b49e9db2e52646728bbd7f3724b069bafbb2bbdb53
+
+The source project declares the GPLv3 license. This repository has not
+independently established the recording's authorship or license. The package
+includes the file unmodified, and this repository's MIT license does not
+cover it.
+
 # Bundled dependencies
 
 ## Three.js

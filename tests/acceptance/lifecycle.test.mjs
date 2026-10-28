@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openBB, openMaxwell } from './harness.mjs';
+import { closeMaxwell, openBB, openMaxwell } from './harness.mjs';
 import { contentBounds, difference, freeze, sample } from './images.mjs';
 
 const draws = (page) => page.evaluate(() => window.maxwellBrowserProbe.draws);
@@ -41,7 +41,7 @@ test('panel and page visibility pause rendering, and reopening releases old cont
       });
       const hidden = await draws(page);
       await page.waitForFunction((value) => window.maxwellBrowserProbe.draws > value + 6, hidden);
-      await page.getByRole('button', { name: 'Close maxwell', exact: true }).click();
+      await closeMaxwell(page);
       await assertPaused(page);
       assert.equal(await page.locator('canvas').count(), 0);
       assert.equal(await page.evaluate(() => window.maxwellBrowserProbe.maxRenderCallbacksPerFrame), 1, 'Reopening must not accumulate concurrent render loops');
