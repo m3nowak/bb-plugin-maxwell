@@ -8,8 +8,14 @@ export default definePluginApp((app) => {
     title: 'maxwell',
     icon: 'maxwell/cat-head' as const,
     layout: 'flush' as const,
-    component: MaxwellPanel,
   };
-  app.slots.experimental_tab({ ...panel, context: { kind: 'thread' }, availability: 'action' });
-  app.slots.experimental_newThreadPanelAction(panel);
+  app.slots.experimental_tab({
+    ...panel,
+    context: { kind: 'thread' },
+    availability: 'action',
+    // A new thread gets a new scene, so no angle or speed carries over.
+    component: ({ threadId }) => <MaxwellPanel key={threadId} threadId={threadId} />,
+  });
+  // Before a thread exists there is no saved speed to follow.
+  app.slots.experimental_newThreadPanelAction({ ...panel, component: () => <MaxwellPanel /> });
 });

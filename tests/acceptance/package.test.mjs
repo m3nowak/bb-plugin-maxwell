@@ -28,5 +28,7 @@ test('the distributable includes local assets, compatible bundles and required n
     assert.match(contents('LICENSE'), /Copyright \(c\) 2026 Mikołaj Nowak/);
     const threeLicense = await readFile(new URL('../../node_modules/three/LICENSE', import.meta.url), 'utf8');
     assert.ok(contents('NOTICE.md').includes(threeLicense), 'The full Three.js license must be included in NOTICE.md');
+    const zodLicense = await readFile(new URL('../../node_modules/zod/LICENSE', import.meta.url), 'utf8');
+    assert.ok(contents('NOTICE.md').includes(zodLicense), 'The full Zod license must be included in NOTICE.md');
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
