@@ -1,6 +1,6 @@
 # Maxwell for BB
 
-Open **Panel Maxwella** from the right panel's **Actions** list to watch Maxwell
+Open **maxwell** from the right panel's **Actions** list to watch Maxwell
 beside your conversation. It also works on **New thread**, before sending a
 message. BB owns the panel tabs, resizing and closing.
 

@@ -11,7 +11,10 @@
     "name": "Maxwell",
     "description": "Maxwell the cat, turning beside your BB conversation.",
     "branding": {
-      "icon": "Cat"
+      "icon": "./assets/icon.svg",
+      "experimental_icons": {
+        "cat-head": "./assets/icon.svg"
+      }
     },
     "server": "./server.ts",
     "app": "./app.tsx"

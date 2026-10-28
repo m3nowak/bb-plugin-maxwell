@@ -41,7 +41,7 @@ test('panel and page visibility pause rendering, and reopening releases old cont
       });
       const hidden = await draws(page);
       await page.waitForFunction((value) => window.maxwellBrowserProbe.draws > value + 6, hidden);
-      await page.getByRole('button', { name: 'Close Panel Maxwella', exact: true }).click();
+      await page.getByRole('button', { name: 'Close maxwell', exact: true }).click();
       await assertPaused(page);
       assert.equal(await page.locator('canvas').count(), 0);
       assert.equal(await page.evaluate(() => window.maxwellBrowserProbe.maxRenderCallbacksPerFrame), 1, 'Reopening must not accumulate concurrent render loops');
@@ -55,11 +55,11 @@ test('the cat stays framed on resize and credits follow live host themes', async
   try {
     await openMaxwell(page);
     await page.waitForFunction(() => window.maxwellBrowserProbe.draws > 6);
-    const light = await page.getByRole('region', { name: 'Panel Maxwella' }).evaluate((element) => getComputedStyle(element).backgroundColor);
+    const light = await page.getByRole('region', { name: 'maxwell' }).evaluate((element) => getComputedStyle(element).backgroundColor);
     // BB's root .dark class is its live theme boundary. Do not alter plugin CSS.
     await page.evaluate(() => document.documentElement.classList.add('dark'));
     await page.waitForTimeout(100);
-    const dark = await page.getByRole('region', { name: 'Panel Maxwella' }).evaluate((element) => getComputedStyle(element).backgroundColor);
+    const dark = await page.getByRole('region', { name: 'maxwell' }).evaluate((element) => getComputedStyle(element).backgroundColor);
     assert.notEqual(light, dark);
     for (const viewport of [{ width: 1440, height: 1000 }, { width: 1100, height: 650 }, { width: 1600, height: 450 }]) {
       await page.setViewportSize(viewport);
@@ -75,6 +75,6 @@ test('the cat stays framed on resize and credits follow live host themes', async
       await page.evaluate(() => window.maxwellBrowserProbe.resume());
     }
     await page.evaluate(() => document.documentElement.classList.remove('dark'));
-    assert.equal(await page.getByRole('region', { name: 'Panel Maxwella' }).evaluate((element) => getComputedStyle(element).backgroundColor), light);
+    assert.equal(await page.getByRole('region', { name: 'maxwell' }).evaluate((element) => getComputedStyle(element).backgroundColor), light);
   } finally { await browser.close(); }
 });

@@ -21,7 +21,7 @@ export function MaxwellPanel() {
   }, []);
 
   return (
-    <section className="maxwell-panel" aria-label="Panel Maxwella">
+    <section className="maxwell-panel" aria-label="maxwell">
       <div className="maxwell-stage" ref={stage}>
         {status && <p className="maxwell-message" role={failed ? 'alert' : 'status'}>{status}</p>}
       </div>

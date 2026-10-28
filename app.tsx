@@ -5,8 +5,8 @@ import './src/panel.css';
 export default definePluginApp((app) => {
   const panel = {
     id: 'maxwell',
-    title: 'Panel Maxwella',
-    icon: 'Cat' as const,
+    title: 'maxwell',
+    icon: 'maxwell/cat-head' as const,
     layout: 'flush' as const,
     component: MaxwellPanel,
   };

@@ -51,7 +51,7 @@ test('graphics context loss stops rendering and a fresh panel recovers', async (
     await page.locator('canvas').evaluate((canvas) => canvas.getContext('webgl2').getExtension('WEBGL_lose_context').loseContext());
     await page.getByRole('alert').filter({ hasText: 'graphics device was reset' }).waitFor();
     await assertStopped(page);
-    await page.getByRole('button', { name: 'Close Panel Maxwella', exact: true }).click();
+    await page.getByRole('button', { name: 'Close maxwell', exact: true }).click();
     await openMaxwell(page);
     await page.getByText('Loading Maxwell', { exact: true }).waitFor({ state: 'hidden' });
     assert.equal(await page.getByRole('alert').count(), 0);

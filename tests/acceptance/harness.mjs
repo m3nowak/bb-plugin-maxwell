@@ -28,8 +28,8 @@ export async function openMaxwell(page, { expectRendering = true } = {}) {
   const show = page.getByRole('button', { name: /^Show right panel/ });
   if (await show.count()) await show.click();
   await page.getByRole('button', { name: /^Open new tab/ }).click();
-  await page.getByRole('button', { name: 'Panel Maxwella', exact: true })
-    .and(page.getByTitle('Panel Maxwella', { exact: true })).click();
-  await page.getByRole('region', { name: 'Panel Maxwella', exact: true }).waitFor();
+  await page.getByRole('button', { name: 'maxwell', exact: true })
+    .and(page.getByTitle('maxwell', { exact: true })).click();
+  await page.getByRole('region', { name: 'maxwell', exact: true }).waitFor();
   if (expectRendering) await page.getByRole('img', { name: 'Maxwell the cat rotating from right to left' }).waitFor();
 }
