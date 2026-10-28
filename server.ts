@@ -1,9 +1,12 @@
 import { defineRpcContract, type BbPluginApi, type PluginAgentToolResult } from '@get-bb/plugin-sdk';
 import { z } from 'zod';
+import { MODE_CHANNEL, type MaxwellMode } from './src/mode';
 import { serveMaxwellMusic } from './src/musicRoute';
 import { DEFAULT_SPEED, isThreadSpeed, speedChannel, type ThreadSpeed } from './src/speed';
 
 export const TOOL_NAME = 'maxwell_set_rotation_speed';
+export const FREE_TOOL_NAME = 'maxwell_free';
+export const CAPTURE_TOOL_NAME = 'maxwell_capture';
 
 export const rpcContract = defineRpcContract({
   speed: {
@@ -64,5 +67,41 @@ export default function maxwell(bb: BbPluginApi) {
         return failure("Maxwell's rotation speed could not be saved. The previous speed is unchanged.");
       }
     },
+  });
+
+  // Every call publishes, even a repeat: only each tab knows its own mode.
+  // Tabs that miss a command are not sent it again.
+  const registerModeCommand = ({ name, command, mode, description, label, sent }: {
+    name: string; command: string; mode: MaxwellMode; description: string;
+    label: { pending: string; completed: string }; sent: string;
+  }) => bb.agents.registerTool({
+    name,
+    description,
+    presentation: { label, icon: { glyph: 'maxwell/cat-head' } },
+    parameters: z.strictObject({}),
+    async execute() {
+      try { bb.realtime.publish(MODE_CHANNEL, { mode }); }
+      catch (error) {
+        bb.log.error(`Publishing the ${command} command failed: ${error instanceof Error ? error.message : String(error)}`);
+        return failure(`The ${command} command could not be sent. No BB tab was told to change where Maxwell is shown.`);
+      }
+      return sent;
+    },
+  });
+  registerModeCommand({
+    name: FREE_TOOL_NAME,
+    command: 'free',
+    mode: 'free',
+    description: 'Free Maxwell the cat: every BB tab connected right now shows him bouncing around the whole BB interface instead of in his panel. Takes no arguments; repeating it is harmless. Confirms only that the command was sent, not that any tab displayed it.',
+    label: { pending: 'Freeing Maxwell', completed: 'Freed Maxwell' },
+    sent: 'Sent the free command to every BB tab connected right now. Tabs that receive it show Maxwell bouncing around the BB interface. Tabs that were not connected, or are opened or reloaded later, keep him in his panel. Display was not confirmed.',
+  });
+  registerModeCommand({
+    name: CAPTURE_TOOL_NAME,
+    command: 'capture',
+    mode: 'panel',
+    description: 'Capture Maxwell the cat: every BB tab connected right now returns him to his panel, without opening any panel. Takes no arguments; repeating it is harmless. Confirms only that the command was sent, not that any tab displayed it.',
+    label: { pending: 'Capturing Maxwell', completed: 'Captured Maxwell' },
+    sent: 'Sent the capture command to every BB tab connected right now. Tabs that receive it show Maxwell in his panel again, wherever a panel is open. Display was not confirmed.',
   });
 }
