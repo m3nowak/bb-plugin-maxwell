@@ -5,7 +5,9 @@ import {
 } from 'three';
 import model from '../assets/maxwell.json';
 
-const TURN_PER_MS = 2 * Math.PI / 5000;
+const TURN_PER_MS = 2 * Math.PI / 2500;
+const BOB_PER_MS = 2 * Math.PI / 3000;
+const BOB_HEIGHT_RATIO = 0.035;
 const ELEVATION = 14 * Math.PI / 180;
 const FOV = 30;
 
@@ -37,10 +39,17 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
   let height = 0;
   let running = false;
   let previousTime: number | null = null;
+  let bobPhase = 0;
+  let bobAmplitude = 0;
 
   const frame = (time: number) => {
     if (!running) return;
-    if (previousTime !== null) cat.rotation.y = (cat.rotation.y - (time - previousTime) * TURN_PER_MS) % (2 * Math.PI);
+    if (previousTime !== null) {
+      const elapsed = time - previousTime;
+      cat.rotation.y = (cat.rotation.y - elapsed * TURN_PER_MS) % (2 * Math.PI);
+      bobPhase = (bobPhase + elapsed * BOB_PER_MS) % (2 * Math.PI);
+      cat.position.y = Math.sin(bobPhase) * bobAmplitude;
+    }
     previousTime = time;
     try { renderer.render(scene, camera); }
     catch {
@@ -65,8 +74,8 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
       // A sphere enclosing every vertex also encloses every angle of rotation,
-      // including transparent whisker planes. Use the narrower field of view.
-      const radius = geometry!.boundingSphere!.radius;
+      // including whiskers and the full vertical bob. Use the narrower field of view.
+      const radius = geometry!.boundingSphere!.radius + bobAmplitude;
       const halfFov = Math.min(FOV * Math.PI / 360, Math.atan(Math.tan(FOV * Math.PI / 360) * camera.aspect));
       const distance = radius * 1.1 / Math.sin(halfFov);
       camera.position.set(0, Math.sin(ELEVATION), Math.cos(ELEVATION)).multiplyScalar(distance);
@@ -118,6 +127,7 @@ export function mountMaxwellScene(stage: HTMLElement, canvas: HTMLCanvasElement,
     try {
       geometry = new BufferGeometryLoader().parse(model.geometry);
       geometry.computeBoundingSphere();
+      bobAmplitude = geometry.boundingSphere!.radius * BOB_HEIGHT_RATIO;
       const images = await Promise.all([model.body, model.whiskers].map(async (url) => {
         const image = new Image();
         image.src = url;

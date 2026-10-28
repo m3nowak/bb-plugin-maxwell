@@ -6,6 +6,7 @@
   let activeCallback;
   let held;
   let time = 0;
+  let firstDrawTime = null;
   let serial = 0;
   const callbacksAt = new Map();
   const probe = { draws: 0, hold: false, contexts: 0, lost: 0, imageDecodes: 0, maxRenderCallbacksPerFrame: 0 };
@@ -38,6 +39,8 @@
     finally {
       activeCallback = undefined;
       if (renderCallbacks.has(callback)) {
+        time = timestamp;
+        firstDrawTime ??= timestamp;
         const count = (callbacksAt.get(timestamp) ?? 0) + 1;
         callbacksAt.set(timestamp, count);
         probe.maxRenderCallbacksPerFrame = Math.max(probe.maxRenderCallbacksPerFrame, count);
@@ -66,6 +69,7 @@
   const decode = HTMLImageElement.prototype.decode;
   HTMLImageElement.prototype.decode = function () { probe.imageDecodes++; return decode.call(this); };
   probe.pendingFrames = () => pending.size + (held ? 1 : 0);
+  probe.elapsedRenderingTime = () => time - (firstDrawTime ?? time);
   probe.freeze = () => { probe.hold = true; };
   probe.isHeld = () => Boolean(held);
   probe.step = (milliseconds) => {

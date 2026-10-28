@@ -4,10 +4,12 @@ Open **maxwell** from the right panel's **Actions** list to watch Maxwell
 beside your conversation. It also works on **New thread**, before sending a
 message. BB owns the panel tabs, resizing and closing.
 
-Maxwell turns from right to left at 12 rpm, one turn every five seconds,
-including when the system requests reduced motion. The camera stays fixed.
+Maxwell turns from right to left at 24 rpm, one turn every 2.5 seconds, and
+gently bobs up and down at 20 cycles per minute, one cycle every three seconds.
+Both motions continue when the system requests reduced motion. The camera
+stays fixed.
 The scene pauses while the panel or page is hidden and resumes from the same
-orientation. There are no settings, playback controls or sound.
+orientation and height. There are no settings, playback controls or sound.
 
 The model, textures and renderer are bundled locally. Attribution below the
 scene links to the creator, model and license. Those links only contact
