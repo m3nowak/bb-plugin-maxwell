@@ -15,7 +15,7 @@ Rozszerzenie OpenChamber z projektu m3nowak/och-plugin-demo, do którego odnosi 
 Obrót kota z prawa do lewa, przeciwny do obrotu szczura we wzorcu.
 
 **Taniec Maxwella**:
-Rytmiczne bujanie Maxwella na boki w stałym tempie.
+Rytmiczne bujanie Maxwella na boki względem własnego ciała, wokół osi głowa–ogon, w stałym tempie. Boki odnoszą się do kota, nie do perspektywy widza.
 
 **Aktywny czat**:
 Oglądana rozmowa BB, w której wysłano już pierwszą wiadomość, niezależnie od tego, czy agent aktualnie pracuje.

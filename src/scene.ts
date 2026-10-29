@@ -43,8 +43,9 @@ export function mountMaxwellScene(
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new Scene();
   const cat = new Group();
-  // Turn about the cat's own vertical first, then tilt as seen by the camera.
-  cat.rotation.order = 'ZXY';
+  // Local Z runs along the body. Yaw chooses the heading, then roll leans
+  // around that head-to-tail axis, not the screen's depth axis.
+  cat.rotation.order = 'YXZ';
   scene.add(cat, new HemisphereLight(0xffffff, 0x5a5048, 1.6));
   const key = new DirectionalLight(0xffffff, 2.2);
   key.position.set(-2, 4, 3);
@@ -72,7 +73,8 @@ export function mountMaxwellScene(
     const elapsed = previousTime === null ? 0 : time - previousTime;
     const pose = motion.advance(elapsed);
     cat.rotation.set(0, pose.yaw, pose.roll);
-    cat.position.set(pose.x * radius, pose.y * radius, 0);
+    // The sway is across the cat's own body, so it follows the heading too.
+    cat.position.set(Math.cos(pose.yaw) * pose.x * radius, pose.y * radius, -Math.sin(pose.yaw) * pose.x * radius);
     if (pose.reach !== reach) {
       reach = pose.reach;
       frameCamera();

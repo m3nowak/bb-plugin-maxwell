@@ -185,11 +185,12 @@ image and 1/2, 1/3, 1/4 and 1/5 of a turn do not. Twenty turns expose an
 error of about 1%, such as rounding to whole percents. Both images are taken
 where the three-second bob is at the same height. The chest's light pixels must cross the
 view from right to left. The dance must repeat after 903 ms and after 20 more
-periods, sway right and then left by over a quarter of the cat's width, and
-keep the chest in view in every frame. Its largest rendered silhouette area
-must be less than 1.1 times its smallest, rejecting the foreshortening of
-front-to-back rocking even when its centre moves sideways. It must also fit
-the frame. A change
+periods, visibly sway by over a quarter of the cat's width, and keep the chest
+in view in every frame. The probe also observes the model-view matrices sent
+to WebGL. The model's head-to-tail direction must stay fixed while it rolls
+to both sides. Its centre must move across that direction, not along it,
+alternating between its own sides. These are body-relative assertions, not
+screen-relative ones. It must also fit the frame. A change
 must start repeating its new motion within 250–700 ms. Consecutive frames,
 and frames taken either side of a new target in mid-change, must not jump.
 Turning to face the viewer, from 24 or 120 rpm, must not change the image
@@ -206,9 +207,11 @@ of the cat's width across and two fifths of its height up; the other is a lean
 down to the left. The reference shows Maxwell in three-quarter view; the
 plugin keeps him facing the viewer, as the issue requires.
 
-The plugin uses sideways roll for these beats, without the yaw and pitch
-oscillations in the first implementation. Those made him rock toward and
-away from the viewer despite the sideways movement of his centre.
+The plugin uses roll around the model's local Z axis, which runs along its
+body. Its sideways offset follows its heading too. Yaw and pitch
+oscillations are not part of the dance. The screen projection can change
+shape during a body-relative lean, so constant silhouette area is not an
+acceptance criterion.
 
 The dance test writes one period of frames to `artifacts/dance-*.png`, and
 the speed test writes quarter turns to `artifacts/rotation-*.png`. Compare
@@ -279,11 +282,18 @@ Not verified here:
 - Context readings reported by a real Claude Code or Codex agent.
 - Two Maxwell panels side by side, which BB 0.48 does not offer.
 
-### Sideways dance correction in PR #11
+### Body-relative dance correction in PR #11
 
-The strengthened rendered-area check failed on the original dance with a
-largest/smallest silhouette area ratio of 1.288. Removing pitch alone still
-failed at 1.263. Removing both dance yaw and pitch, while retaining roll,
-sideways offsets, the hop and the 903 ms period, reduced it to 1.019. The
-targeted browser test passes on New thread, with music and in an empty chat,
-then verifies rotation after the first message. Build and typecheck pass.
+The first correction removed dance yaw and pitch, but still applied roll
+and sideways offsets relative to the viewer. Its silhouette-area assertion
+checked the wrong requirement. The user clarified that the sway is relative
+to Maxwell's own body, not the screen.
+
+The replacement WebGL transform assertion fails on that version with
+"The cat must roll about its own head-to-tail axis, not the viewer's axis".
+Changing the Euler order from ZXY to YXZ makes roll follow the cat's heading;
+rotating the sideways offset by that heading also keeps translation across
+the body. The targeted browser test then passes on New thread, with music
+and in an empty chat, and verifies rotation after the first message. The
+hop, 903 ms tempo and smooth transitions are retained. Build and typecheck
+pass, as do the six package and tool tests.

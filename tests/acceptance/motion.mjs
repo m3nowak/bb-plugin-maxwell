@@ -104,8 +104,12 @@ export async function assertRightToLeft(page, rpm) {
 export async function assertDancing(page, where = '') {
   // Start at the rest before the sway to the right.
   const images = [];
+  const transforms = [];
   const start = mod(-await sceneTime(page), DANCE_PERIOD);
-  for (let index = 0; index < 24; index++) images.push(await sample(page, index ? DANCE_PERIOD / 24 : start));
+  for (let index = 0; index < 24; index++) {
+    images.push(await sample(page, index ? DANCE_PERIOD / 24 : start));
+    transforms.push(await page.evaluate(() => window.maxwellBrowserProbe.modelView()));
+  }
   const again = await sample(page, DANCE_PERIOD / 24);
   assert.ok(difference(images[0], again) < 0.5, `The dance must repeat after ${DANCE_PERIOD} ms ${where}`);
   const later = await sample(page, DANCE_PERIOD * 20);
@@ -117,18 +121,29 @@ export async function assertDancing(page, where = '') {
     const bounds = contentBounds(image);
     assert.ok(bounds.left > 2 && bounds.top > 2 && bounds.right < image.width - 3 && bounds.bottom < image.height - 3, `The whole dancing cat must stay in view ${where}`);
   }
-  // A sideways lean rotates the silhouette without foreshortening it. Merely
-  // moving its centre left and right also passes when the cat pitches toward
-  // and away from the viewer, so check its rendered area as well.
-  const areas = images.map((image) => contentBounds(image).pixels);
-  const areaRatio = Math.max(...areas) / Math.min(...areas);
-  assert.ok(areaRatio < 1.1, `The cat must lean sideways, not rock toward and away from the viewer (silhouette area ratio ${areaRatio.toFixed(3)}) ${where}`);
+  // In the bundled model, local Z runs from head to tail. A body-relative
+  // roll leaves that direction fixed while its up vector leans either way.
+  // Screen-relative roll and fore/aft pitch both change the body direction.
+  const dot = (a, b) => a.reduce((sum, value, index) => sum + value * b[index], 0);
+  const axis = (matrix, column) => matrix.slice(column * 4, column * 4 + 3);
+  assert.ok(transforms.every((matrix) => Array.isArray(matrix) && matrix.length === 16), `The dance must send its transforms to WebGL ${where}`);
+  const forward = axis(transforms[0], 2);
+  const side = axis(transforms[0], 0);
+  const up = axis(transforms[0], 1);
+  const origin = axis(transforms[0], 3);
+  const rolls = [], offsets = [];
+  for (const matrix of transforms) {
+    assert.ok(Math.hypot(...axis(matrix, 2).map((value, i) => value - forward[i])) < 1e-5, `The cat must roll about its own head-to-tail axis, not the viewer's axis ${where}`);
+    const delta = axis(matrix, 3).map((value, i) => value - origin[i]);
+    assert.ok(Math.abs(dot(delta, forward)) < 1e-5, `The sway must move across the cat's body, not along it ${where}`);
+    rolls.push(Math.atan2(dot(axis(matrix, 1), side), dot(axis(matrix, 1), up)));
+    offsets.push(dot(delta, side));
+  }
+  assert.ok(Math.min(...rolls) < -0.1 && Math.max(...rolls) > 0.1, `The body must lean to both sides ${where}`);
+  assert.ok(Math.max(...offsets.slice(0, 12)) > 0.1 && Math.min(...offsets.slice(12)) < -0.1, `The sway must alternate between the cat's own sides ${where}`);
   const centres = images.map(centre);
   const width = contentBounds(images[0]).right - contentBounds(images[0]).left;
   assert.ok(Math.max(...centres) - Math.min(...centres) > width * 0.25, `The cat must sway sideways ${where}`);
-  // Its two beats differ: one sways to the right, the next to the left.
-  const rest = centres[0];
-  assert.ok(Math.max(...centres.slice(0, 12)) > rest + width * 0.1 && Math.min(...centres.slice(12)) < rest - width * 0.1, `The cat must sway right, then left ${where}`);
   return images;
 }
 

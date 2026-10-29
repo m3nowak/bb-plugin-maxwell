@@ -3,6 +3,8 @@
   const renderCallbacks = new Set();
   const pending = new Map();
   const contexts = new Set();
+  const modelViewUniforms = new WeakSet();
+  const modelViews = new WeakMap();
   let activeCallback;
   let held;
   let time = 0;
@@ -25,6 +27,20 @@
     return context;
   };
   for (const prototype of [WebGLRenderingContext.prototype, WebGL2RenderingContext.prototype]) {
+    const getUniformLocation = prototype.getUniformLocation;
+    prototype.getUniformLocation = function (program, name) {
+      const location = getUniformLocation.call(this, program, name);
+      if (location && name === 'modelViewMatrix') modelViewUniforms.add(location);
+      return location;
+    };
+    const uniformMatrix4fv = prototype.uniformMatrix4fv;
+    prototype.uniformMatrix4fv = function (location, transpose, values, ...args) {
+      if (modelViewUniforms.has(location)) {
+        const offset = args[0] ?? 0;
+        modelViews.set(this.canvas, Array.from(values).slice(offset, offset + 16));
+      }
+      return uniformMatrix4fv.call(this, location, transpose, values, ...args);
+    };
     for (const name of ['drawArrays', 'drawElements']) {
       const original = prototype[name];
       prototype[name] = function (...args) {
@@ -90,6 +106,8 @@
     const context = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
     return context && firstDraws.has(context) ? time - firstDraws.get(context) : null;
   };
+  // The transform actually sent to WebGL, not scene or component state.
+  probe.modelView = () => modelViews.get(document.querySelector('canvas[aria-label^="Maxwell the cat"]'));
   probe.resume = () => {
     probe.hold = false;
     if (held) {

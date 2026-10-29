@@ -18,9 +18,8 @@ const BOB = 0.105;
 const FRONT = 0.6;
 
 /**
- * The two beats of the sway, at their extremes: a hop up to the right,
- * then a lean down to the left. Tilt sideways only, keeping the same view
- * of the face instead of rocking toward and away from the viewer.
+ * The two beats of the sway, at their extremes: a hop to one side of the
+ * body, then a lean to the other. Roll about the cat's head-to-tail axis.
  * Offsets are fractions of the model's radius, angles in radians.
  */
 const HOP = { x: 0.26, y: 0.36, roll: 0.17 };
@@ -104,12 +103,12 @@ function sway(time: number) {
 }
 
 export interface Pose {
-  /** Offsets as fractions of the model's radius. */
+  /** Offsets across the body and vertically, as fractions of the model's radius. */
   x: number;
   y: number;
   /** Furthest the centre can be from rest in the current blend of motions, as a fraction of the radius. */
   reach: number;
-  /** Radians, applied as yaw, then sideways roll. */
+  /** Heading and roll about the body's own head-to-tail axis, in radians. */
   yaw: number;
   roll: number;
 }
