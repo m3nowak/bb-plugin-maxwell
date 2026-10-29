@@ -17,20 +17,12 @@ const BOB = 0.105;
 /** Revolution at which Maxwell looks into the camera. */
 const FRONT = 0.6;
 
-/**
- * The two beats of the sway, at their extremes: a hop to one side of the
- * body, then a lean to the other. Roll about the cat's head-to-tail axis.
- * Offsets are fractions of the model's radius, angles in radians.
- */
-const HOP = { x: 0.26, y: 0.36, roll: 0.17 };
-const LEAN = { x: -0.28, y: 0.06, roll: -0.24 };
-/** Furthest the dance moves the cat's centre. */
-const DANCE_REACH = Math.max(...[HOP, LEAN].map(({ x, y }) => Math.hypot(x, y)));
+/** Equal lean to either side of the body, in radians. The dance stays in place. */
+const DANCE_ROLL = 0.2;
 
 const smooth = (u: number) => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 /** The integral of smooth from 0 to u. */
 const smoothArea = (u: number) => u <= 0 ? 0 : u >= 1 ? u - 0.5 : u ** 3 - u ** 4 / 2;
-const between = (from: number, to: number, u: number) => smooth((u - from) / (to - from));
 const same = (one: MaxwellMotion, other: MaxwellMotion) =>
   one.kind === 'dance' ? other.kind === 'dance' : other.kind === 'spin' && other.rpm === one.rpm;
 
@@ -92,21 +84,16 @@ function planSettle(position: number, rate: number) {
   return { to: position - best.distance, duration: best.duration };
 }
 
-/** The sway at a time, from rest through one beat's extreme and back to rest. */
+/** Continuous, symmetric roll around the body's head-to-tail axis. */
 function sway(time: number) {
   const phase = (time % DANCE_PERIOD_MS) / DANCE_PERIOD_MS;
-  const beat = phase < 0.5 ? HOP : LEAN;
-  const q = (phase % 0.5) * 2;
-  // Measured from the reference: a short rest, a quick move, a hold, and back.
-  const k = between(0.15, 0.5, q) - between(0.68, 1, q);
-  return { x: beat.x * k, y: beat.y * k, roll: beat.roll * k };
+  return Math.sin(phase * 2 * Math.PI) * DANCE_ROLL;
 }
 
 export interface Pose {
-  /** Offsets across the body and vertically, as fractions of the model's radius. */
-  x: number;
+  /** Vertical bob during rotation, as a fraction of the model's radius. */
   y: number;
-  /** Furthest the centre can be from rest in the current blend of motions, as a fraction of the radius. */
+  /** Framing allowance for the rotation's bob, as a fraction of the radius. */
   reach: number;
   /** Heading and roll about the body's own head-to-tail axis, in radians. */
   yaw: number;
@@ -161,13 +148,12 @@ export function choreograph() {
         turning = { kind: 'ramp', start: time, from: position, rate: turning.toRate, toRate: turning.toRate };
       }
       const dance = smooth(weightAt(time));
-      const step = sway(time);
       return {
-        x: dance * step.x,
-        y: (1 - dance) * Math.sin(bobPhase) * BOB + dance * step.y,
-        reach: (1 - dance) * BOB + dance * DANCE_REACH,
+        y: (1 - dance) * Math.sin(bobPhase) * BOB,
+        // The same framing in both modes avoids camera movement as they blend.
+        reach: BOB,
         yaw: position * 2 * Math.PI,
-        roll: dance * step.roll,
+        roll: dance * sway(time),
       };
     },
   };

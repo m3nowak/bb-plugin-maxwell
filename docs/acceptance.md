@@ -185,11 +185,11 @@ image and 1/2, 1/3, 1/4 and 1/5 of a turn do not. Twenty turns expose an
 error of about 1%, such as rounding to whole percents. Both images are taken
 where the three-second bob is at the same height. The chest's light pixels must cross the
 view from right to left. The dance must repeat after 903 ms and after 20 more
-periods, visibly sway by over a quarter of the cat's width, and keep the chest
+periods, visibly lean to both sides, and keep the chest
 in view in every frame. The probe also observes the model-view matrices sent
 to WebGL. The model's head-to-tail direction must stay fixed while it rolls
-to both sides. Its centre must move across that direction, not along it,
-alternating between its own sides. These are body-relative assertions, not
+to both sides. Angles half a period apart must be equal and opposite, and
+its centre must stay fixed in all three dimensions. These are body-relative assertions, not
 screen-relative ones. It must also fit the frame. A change
 must start repeating its new motion within 250–700 ms. Consecutive frames,
 and frames taken either side of a new target in mid-change, must not jump.
@@ -200,16 +200,15 @@ The dance period was measured from the swaying parts of the
 [reference video](https://www.youtube.com/watch?v=rXh8Hvo7gfs) (0–3.6 s and
 7.2–14.5 s at 24 fps). The cat's horizontal centre was fitted against
 candidate periods: 0.9055 s over the first part and 0.9030 s over the longer
-second part. One sway to the right and back from the left takes 903 ms. Its
-shape was read from the same frames: a short rest, a quick move, a hold and
-a return in each half. One half is a hop up and to the right, about a quarter
-of the cat's width across and two fifths of its height up; the other is a lean
-down to the left. The reference shows Maxwell in three-quarter view; the
-plugin keeps him facing the viewer, as the issue requires.
+second part. One full sway takes 903 ms. The initial choreography also
+copied the reference's asymmetric hop and lean. The user subsequently asked
+for a symmetric sway in place instead, so only the reference's tempo is
+retained. The plugin keeps Maxwell facing the viewer, as the issue requires.
 
 The plugin uses roll around the model's local Z axis, which runs along its
-body. Its sideways offset follows its heading too. Yaw and pitch
-oscillations are not part of the dance. The screen projection can change
+body, with a sinusoidal amplitude of ±0.2 radians and no translation or hop.
+Both modes use the same camera framing, avoiding a zoom during transitions.
+Yaw and pitch oscillations are not part of the dance. The screen projection can change
 shape during a body-relative lean, so constant silhouette area is not an
 acceptance criterion.
 
@@ -264,9 +263,9 @@ The three failures are not caused by this change:
   no URL. It fails the same way when `main` is installed on the same BB
   0.48.0, which suggests BB's link handling changed since 0.47.1.
 
-The dance frames from `artifacts/dance-*.png` were compared in order with the
-same phase of the reference's swaying part. The rest, hop, hold, return and
-lean fall on the same frames of the period.
+During the initial implementation, the dance frames were compared with the
+reference's rest, hop, hold, return and lean. That shape has since been
+replaced by the user's requested symmetric sway in place.
 
 Turning to face the viewer was simulated separately for 5,000 random speeds,
 angles and earlier changes. It never turned back, always ended facing the
@@ -297,3 +296,18 @@ the body. The targeted browser test then passes on New thread, with music
 and in an empty chat, and verifies rotation after the first message. The
 hop, 903 ms tempo and smooth transitions are retained. Build and typecheck
 pass, as do the six package and tool tests.
+
+### Symmetric sway in place
+
+The user removed the asymmetric hop and lateral displacement from the
+requirements. The dance now uses a single sine wave, ±0.2 radians around
+the same body axis, with the 903 ms period unchanged. Its centre stays at
+rest; the vertical bob still applies during rotation only. Camera framing
+is constant between modes.
+
+The browser regression checks all 24 poses for a fixed WebGL translation,
+and each pair half a period apart for equal and opposite roll. It rejects
+the previous choreography with "The dancing cat must stay in place, without
+sideways movement or hopping", then passes with the new sway, including
+with music and in an empty chat. The two extreme poses must also differ in
+rendered pixels. Build, typecheck and the six package/tool tests pass.

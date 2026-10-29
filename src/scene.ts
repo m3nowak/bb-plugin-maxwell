@@ -73,8 +73,7 @@ export function mountMaxwellScene(
     const elapsed = previousTime === null ? 0 : time - previousTime;
     const pose = motion.advance(elapsed);
     cat.rotation.set(0, pose.yaw, pose.roll);
-    // The sway is across the cat's own body, so it follows the heading too.
-    cat.position.set(Math.cos(pose.yaw) * pose.x * radius, pose.y * radius, -Math.sin(pose.yaw) * pose.x * radius);
+    cat.position.set(0, pose.y * radius, 0);
     if (pose.reach !== reach) {
       reach = pose.reach;
       frameCamera();
@@ -100,8 +99,8 @@ export function mountMaxwellScene(
     if (width === 0 || height === 0) return;
     camera.aspect = width / height;
     // A sphere enclosing every vertex also encloses every angle of rotation
-    // and tilt, including whiskers. Widen it by the furthest the current bob
-    // and dance can move the cat. Use the narrower field of view.
+    // and tilt, including whiskers. Reserve room for the rotation's bob in
+    // both modes so the camera stays still. Use the narrower field of view.
     const framed = radius * (1 + reach);
     const halfFov = Math.min(FOV * Math.PI / 360, Math.atan(Math.tan(FOV * Math.PI / 360) * camera.aspect));
     const distance = framed * 1.1 / Math.sin(halfFov);

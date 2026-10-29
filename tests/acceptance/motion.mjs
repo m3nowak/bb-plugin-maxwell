@@ -79,7 +79,6 @@ function front(image) {
   }
   return { share: light / Math.max(1, cat), x: light ? x / light : null };
 }
-const centre = (image) => { const bounds = contentBounds(image); return (bounds.left + bounds.right) / 2; };
 
 /** A turning cat's chest crosses the view from right to left. */
 export async function assertRightToLeft(page, rpm) {
@@ -131,19 +130,18 @@ export async function assertDancing(page, where = '') {
   const side = axis(transforms[0], 0);
   const up = axis(transforms[0], 1);
   const origin = axis(transforms[0], 3);
-  const rolls = [], offsets = [];
+  const rolls = [];
   for (const matrix of transforms) {
     assert.ok(Math.hypot(...axis(matrix, 2).map((value, i) => value - forward[i])) < 1e-5, `The cat must roll about its own head-to-tail axis, not the viewer's axis ${where}`);
     const delta = axis(matrix, 3).map((value, i) => value - origin[i]);
-    assert.ok(Math.abs(dot(delta, forward)) < 1e-5, `The sway must move across the cat's body, not along it ${where}`);
+    assert.ok(Math.hypot(...delta) < 1e-5, `The dancing cat must stay in place, without sideways movement or hopping ${where}`);
     rolls.push(Math.atan2(dot(axis(matrix, 1), side), dot(axis(matrix, 1), up)));
-    offsets.push(dot(delta, side));
   }
   assert.ok(Math.min(...rolls) < -0.1 && Math.max(...rolls) > 0.1, `The body must lean to both sides ${where}`);
-  assert.ok(Math.max(...offsets.slice(0, 12)) > 0.1 && Math.min(...offsets.slice(12)) < -0.1, `The sway must alternate between the cat's own sides ${where}`);
-  const centres = images.map(centre);
-  const width = contentBounds(images[0]).right - contentBounds(images[0]).left;
-  assert.ok(Math.max(...centres) - Math.min(...centres) > width * 0.25, `The cat must sway sideways ${where}`);
+  for (let index = 0; index < 12; index++) {
+    assert.ok(Math.abs(rolls[index] + rolls[index + 12]) < 1e-5, `Both halves of the sway must mirror each other ${where}`);
+  }
+  assert.ok(difference(images[6], images[18]) > 1, `Both sides of the sway must be visibly different ${where}`);
   return images;
 }
 
