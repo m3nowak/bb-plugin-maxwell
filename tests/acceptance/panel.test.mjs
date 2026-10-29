@@ -1,13 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { openBB, openMaxwell } from './harness.mjs';
+import { DANCING, openBB, openMaxwell, ROTATING } from './harness.mjs';
+import { assertDancing, sceneTime, serveThreads } from './motion.mjs';
 
-test('Actions opens the locally bundled Maxwell beside the new-thread composer', async () => {
+const existingThread = () => {
+  const threadId = process.env.MAXWELL_THREAD_ID ?? process.env.BB_THREAD_ID;
+  assert.ok(threadId, 'Set MAXWELL_THREAD_ID to an existing BB thread for acceptance tests');
+  return threadId;
+};
+
+test('Actions opens the locally bundled Maxwell beside the new-thread composer, dancing', async () => {
   const { browser, page } = await openBB();
   try {
     await openMaxwell(page);
     await page.getByText('Loading Maxwell').waitFor({ state: 'hidden' });
     assert.equal(await page.locator('canvas').count(), 1);
+    assert.equal(await page.getByRole('img', { name: DANCING }).count(), 1, 'Without a chat Maxwell dances');
+    await page.waitForFunction(() => window.maxwellBrowserProbe.draws > 6);
+    await freeze(page);
+    await assertDancing(page, 'beside the new-thread composer');
     assert.equal(await page.getByRole('link', { name: 'bean(alwayshasbean)' }).getAttribute('href'), 'https://sketchfab.com/alwayshasbean');
     assert.equal(await page.getByRole('link', { name: 'CC BY 4.0' }).getAttribute('href'), 'https://creativecommons.org/licenses/by/4.0/');
     assert.equal(await page.getByRole('alert').count(), 0);
@@ -18,25 +29,30 @@ import { contentBounds, difference, freeze, sample } from './images.mjs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { PNG } from 'pngjs';
 
-test('rendered rotation is 24 rpm with a 20-cycle bob, including reduced motion', async () => {
+test('rendered rotation in a chat without a reading is 24 rpm with a 20-cycle bob, including reduced motion', async () => {
   for (const reducedMotion of ['no-preference', 'reduce']) {
     const { browser, page } = await openBB({ reducedMotion });
     try {
+      const served = await serveThreads(page);
+      served.context(existingThread(), { usage: null });
       const externalRequests = [];
       await page.route('**/*', (route) => {
         const url = new URL(route.request().url());
-        if (/^https?:$/.test(url.protocol) && url.origin !== new URL(page.url()).origin) {
+        // BB's own host daemon listens on another port of the same host.
+        if (/^https?:$/.test(url.protocol) && url.hostname !== new URL(page.url()).hostname) {
           externalRequests.push(url.href);
           return route.abort();
         }
-        return route.continue();
+        return route.fallback();
       });
+      await page.goto(new URL(`/threads/${existingThread()}`, page.url()).href);
       await openMaxwell(page);
+      assert.equal(await page.getByRole('img', { name: ROTATING }).count(), 1, 'In a chat Maxwell rotates');
       await page.waitForFunction(() => window.maxwellBrowserProbe.draws > 6);
       await freeze(page);
       // Pick a point one second into a bob cycle. The bob has the same
       // height 2.5 seconds later, isolating a complete rotation in pixels.
-      const elapsed = await page.evaluate(() => window.maxwellBrowserProbe.elapsedRenderingTime());
+      const elapsed = await sceneTime(page);
       const start = 1000 + Math.ceil(Math.max(0, elapsed - 1000) / 3000) * 3000;
       const initial = await sample(page, start - elapsed);
       const quarter = await sample(page, 625);
@@ -75,9 +91,7 @@ test('rendered rotation is 24 rpm with a 20-cycle bob, including reduced motion'
 test('Actions also opens Maxwell beside an existing conversation', async () => {
   const { browser, page } = await openBB();
   try {
-    const threadId = process.env.MAXWELL_THREAD_ID ?? process.env.BB_THREAD_ID;
-    assert.ok(threadId, 'Set MAXWELL_THREAD_ID to an existing BB thread for acceptance tests');
-    await page.goto(new URL(`/threads/${threadId}`, page.url()).href);
+    await page.goto(new URL(`/threads/${existingThread()}`, page.url()).href);
     await openMaxwell(page);
     await page.waitForFunction(() => window.maxwellBrowserProbe.draws > 6);
     const composer = page.getByRole('textbox', { name: 'Ask anything.' });

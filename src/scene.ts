@@ -4,17 +4,17 @@ import {
   Texture, Vector2, WebGLRenderer,
 } from 'three';
 import model from '../assets/maxwell.json';
+import { choreograph, DANCE_ROLL } from './choreography';
+import { createRockingSupport } from './grounding';
+import type { MaxwellMotion } from './motion';
 
-const MS_PER_MINUTE = 60000;
-const BOB_PER_MS = 2 * Math.PI / 3000;
-const BOB_HEIGHT_RATIO = 0.105;
 const ELEVATION = 14 * Math.PI / 180;
 const FOV = 30;
 const WHISKER_ALPHA_TEST = 0.05;
 
 export interface MaxwellScene {
-  /** Change rotation speed from the current angle. 0 stops rotation but not the bob. */
-  setRpm(rpm: number): void;
+  /** Move toward a motion, smoothly from the current one. */
+  setMotion(motion: MaxwellMotion): void;
   dispose(): void;
 }
 
@@ -39,11 +39,14 @@ export function mountMaxwellScene(
   } catch {
     canvas.hidden = true;
     report('The 3D view needs WebGL, which is not available here.');
-    return { setRpm() {}, dispose() {} };
+    return { setMotion() {}, dispose() {} };
   }
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   const scene = new Scene();
   const cat = new Group();
+  // Local Z runs along the body. Yaw chooses the heading, then roll leans
+  // around that head-to-tail axis, not the screen's depth axis.
+  cat.rotation.order = 'YXZ';
   scene.add(cat, new HemisphereLight(0xffffff, 0x5a5048, 1.6));
   const key = new DirectionalLight(0xffffff, 2.2);
   key.position.set(-2, 4, 3);
@@ -52,6 +55,7 @@ export function mountMaxwellScene(
   const textures: Texture[] = [];
   const materials: MeshLambertMaterial[] = [];
   let geometry: ReturnType<BufferGeometryLoader['parse']> | undefined;
+  let support: ReturnType<typeof createRockingSupport> | undefined;
   let disposed = false;
   let ready = false;
   let inView = false;
@@ -59,28 +63,26 @@ export function mountMaxwellScene(
   let height = 0;
   let running = false;
   let previousTime: number | null = null;
-  let turnsPerMs = 0;
-  // Fraction of a revolution, kept in (-1, 0] so precision does not decay.
-  let turn = 0;
-  let bobPhase = 0;
-  let bobAmplitude = 0;
+  const motion = choreograph();
+  let radius = 0;
+  let reach = 0;
   let whiskerAlpha: ImageData | undefined;
   const raycaster = new Raycaster();
   const pointer = new Vector2();
 
   const frame = (time: number) => {
     if (!running) return;
-    if (previousTime !== null) {
-      const elapsed = time - previousTime;
-      // Only the fraction of a frame's turns matters. At extreme speeds that
-      // fraction can vanish or the product overflow; keep the angle finite.
-      const turns = elapsed * turnsPerMs;
-      if (Number.isFinite(turns)) turn = (turn - turns % 1) % 1;
-      cat.rotation.y = turn * 2 * Math.PI;
-      bobPhase = (bobPhase + elapsed * BOB_PER_MS) % (2 * Math.PI);
-      cat.position.y = Math.sin(bobPhase) * bobAmplitude;
-      onFrame?.(elapsed);
+    const elapsed = previousTime === null ? 0 : time - previousTime;
+    const pose = motion.advance(elapsed);
+    const grounded = support!.at(pose.roll);
+    cat.rotation.set(0, pose.yaw, pose.roll);
+    cat.position.set(Math.cos(pose.yaw) * grounded.x, pose.y * radius + grounded.y, -Math.sin(pose.yaw) * grounded.x);
+    const framing = Math.max(pose.reach, support!.reach / radius);
+    if (framing !== reach) {
+      reach = framing;
+      frameCamera();
     }
+    if (previousTime !== null) onFrame?.(elapsed);
     previousTime = time;
     try { renderer.render(scene, camera); }
     catch {
@@ -97,23 +99,28 @@ export function mountMaxwellScene(
     renderer.setAnimationLoop(visible ? frame : null);
   };
 
+  const frameCamera = () => {
+    if (width === 0 || height === 0) return;
+    camera.aspect = width / height;
+    // A sphere enclosing every vertex also encloses every angle of rotation
+    // and tilt, including whiskers. Reserve room for the bob and grounding in
+    // both modes so the camera stays still. Use the narrower field of view.
+    const framed = radius * (1 + reach);
+    const halfFov = Math.min(FOV * Math.PI / 360, Math.atan(Math.tan(FOV * Math.PI / 360) * camera.aspect));
+    const distance = framed * 1.1 / Math.sin(halfFov);
+    camera.position.set(0, Math.sin(ELEVATION), Math.cos(ELEVATION)).multiplyScalar(distance);
+    camera.near = distance / 10;
+    camera.far = distance * 10;
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+  };
   const resize = () => {
     const rect = stage.getBoundingClientRect();
     width = Math.floor(rect.width);
     height = Math.floor(rect.height);
     if (!disposed && ready && width > 0 && height > 0) {
       renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      // A sphere enclosing every vertex also encloses every angle of rotation,
-      // including whiskers and the full vertical bob. Use the narrower field of view.
-      const radius = geometry!.boundingSphere!.radius + bobAmplitude;
-      const halfFov = Math.min(FOV * Math.PI / 360, Math.atan(Math.tan(FOV * Math.PI / 360) * camera.aspect));
-      const distance = radius * 1.1 / Math.sin(halfFov);
-      camera.position.set(0, Math.sin(ELEVATION), Math.cos(ELEVATION)).multiplyScalar(distance);
-      camera.near = distance / 10;
-      camera.far = distance * 10;
-      camera.lookAt(0, 0, 0);
-      camera.updateProjectionMatrix();
+      frameCamera();
     }
     updateLoop();
   };
@@ -180,7 +187,17 @@ export function mountMaxwellScene(
     try {
       geometry = new BufferGeometryLoader().parse(model.geometry);
       geometry.computeBoundingSphere();
-      bobAmplitude = geometry.boundingSphere!.radius * BOB_HEIGHT_RATIO;
+      radius = geometry.boundingSphere!.radius;
+      const positions = geometry.getAttribute('position');
+      const body: { x: number; y: number }[] = [];
+      for (const { start, count, materialIndex } of geometry.groups) {
+        if (materialIndex !== 0) continue;
+        for (let i = start; i < start + count; i++) {
+          const vertex = geometry.index ? geometry.index.getX(i) : i;
+          body.push({ x: positions.getX(vertex), y: positions.getY(vertex) });
+        }
+      }
+      support = createRockingSupport(body, DANCE_ROLL);
       const images = await Promise.all([model.body, model.whiskers].map(async (url) => {
         const image = new Image();
         image.src = url;
@@ -213,7 +230,7 @@ export function mountMaxwellScene(
   };
   void load();
   return {
-    setRpm(rpm) { turnsPerMs = rpm / MS_PER_MINUTE; },
+    setMotion: motion.set,
     dispose,
   };
 }

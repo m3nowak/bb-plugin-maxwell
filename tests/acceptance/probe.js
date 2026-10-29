@@ -3,10 +3,14 @@
   const renderCallbacks = new Set();
   const pending = new Map();
   const contexts = new Set();
+  const modelViewUniforms = new WeakSet();
+  const modelViews = new WeakMap();
   let activeCallback;
   let held;
   let time = 0;
-  let firstDrawTime = null;
+  let frameTime = 0;
+  // Each scene's clock starts at its context's first drawn frame.
+  const firstDraws = new WeakMap();
   let serial = 0;
   const callbacksAt = new Map();
   const probe = { draws: 0, hold: false, contexts: 0, lost: 0, imageDecodes: 0, maxRenderCallbacksPerFrame: 0 };
@@ -23,10 +27,25 @@
     return context;
   };
   for (const prototype of [WebGLRenderingContext.prototype, WebGL2RenderingContext.prototype]) {
+    const getUniformLocation = prototype.getUniformLocation;
+    prototype.getUniformLocation = function (program, name) {
+      const location = getUniformLocation.call(this, program, name);
+      if (location && name === 'modelViewMatrix') modelViewUniforms.add(location);
+      return location;
+    };
+    const uniformMatrix4fv = prototype.uniformMatrix4fv;
+    prototype.uniformMatrix4fv = function (location, transpose, values, ...args) {
+      if (modelViewUniforms.has(location)) {
+        const offset = args[0] ?? 0;
+        modelViews.set(this.canvas, Array.from(values).slice(offset, offset + 16));
+      }
+      return uniformMatrix4fv.call(this, location, transpose, values, ...args);
+    };
     for (const name of ['drawArrays', 'drawElements']) {
       const original = prototype[name];
       prototype[name] = function (...args) {
         probe.draws++;
+        if (!firstDraws.has(this)) firstDraws.set(this, frameTime);
         if (activeCallback) renderCallbacks.add(activeCallback);
         return original.apply(this, args);
       };
@@ -34,13 +53,13 @@
   }
   function invoke(callback, timestamp) {
     activeCallback = callback;
+    frameTime = timestamp;
     if (renderCallbacks.has(callback)) time = timestamp;
     try { callback(timestamp); }
     finally {
       activeCallback = undefined;
       if (renderCallbacks.has(callback)) {
         time = timestamp;
-        firstDrawTime ??= timestamp;
         const count = (callbacksAt.get(timestamp) ?? 0) + 1;
         callbacksAt.set(timestamp, count);
         probe.maxRenderCallbacksPerFrame = Math.max(probe.maxRenderCallbacksPerFrame, count);
@@ -69,7 +88,6 @@
   const decode = HTMLImageElement.prototype.decode;
   HTMLImageElement.prototype.decode = function () { probe.imageDecodes++; return decode.call(this); };
   probe.pendingFrames = () => pending.size + (held ? 1 : 0);
-  probe.elapsedRenderingTime = () => time - (firstDrawTime ?? time);
   probe.freeze = () => { probe.hold = true; };
   probe.isHeld = () => Boolean(held);
   probe.step = (milliseconds) => {
@@ -77,10 +95,19 @@
     const { callback } = held;
     held = undefined;
     time += milliseconds;
+    frameTime = time;
     callback(time);
-    const canvas = document.querySelector('canvas[aria-label="Maxwell the cat rotating from right to left"]');
+    const canvas = document.querySelector('canvas[aria-label^="Maxwell the cat"]');
     return canvas.toDataURL('image/png');
   };
+  // Milliseconds the shown scene has drawn for, by the timestamps it was given.
+  probe.sceneTime = () => {
+    const canvas = document.querySelector('canvas[aria-label^="Maxwell the cat"]');
+    const context = canvas?.getContext('webgl2') ?? canvas?.getContext('webgl');
+    return context && firstDraws.has(context) ? time - firstDraws.get(context) : null;
+  };
+  // The transform actually sent to WebGL, not scene or component state.
+  probe.modelView = () => modelViews.get(document.querySelector('canvas[aria-label^="Maxwell the cat"]'));
   probe.resume = () => {
     probe.hold = false;
     if (held) {

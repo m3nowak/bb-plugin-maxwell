@@ -2,31 +2,33 @@
 // the driver agent in BB, delivered to tabs over BB realtime.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { baseURL, bb, callTool, closeMaxwell, driverProjects, openBB, openMaxwell, openTab, spawnDriver } from './harness.mjs';
+import { baseURL, bb, callTool, CAT, CAT_CANVAS, closeMaxwell, DANCING, driverProjects, openBB, openMaxwell, openTab, ROTATING, spawnDriver } from './harness.mjs';
 import { contentBounds, difference, freeze, sample } from './images.mjs';
 import { assertContinuous, assertSilent, audio, clickCat, MUSIC, position, waitForStarts } from './audio.mjs';
+import { assertDancing, assertRpm, DANCE_PERIOD, frames, largestStep, serveThreads, settledAfter, SETTLED, usage } from './motion.mjs';
 
-const CAT = 'Maxwell the cat rotating from right to left';
 const FREE = 'Maxwell is roaming free.';
 
 /** Where the tab shows Maxwell: canvases inside panels, and outside them. */
-const places = (page) => page.evaluate((label) => {
-  const cats = [...document.querySelectorAll(`canvas[aria-label="${label}"]`)];
+const places = (page) => page.evaluate((selector) => {
+  const cats = [...document.querySelectorAll(selector)];
   const panel = cats.filter((canvas) => canvas.closest('[aria-label="maxwell"]')).length;
   return { panel, free: cats.length - panel, panels: document.querySelectorAll('section[aria-label="maxwell"]').length };
-}, CAT);
+}, CAT_CANVAS);
 async function waitForFree(page) {
-  await page.waitForFunction((label) => {
-    const cats = [...document.querySelectorAll(`canvas[aria-label="${label}"]`)];
+  await page.waitForFunction((selector) => {
+    const cats = [...document.querySelectorAll(selector)];
     return cats.length === 1 && !cats[0].closest('[aria-label="maxwell"]');
-  }, CAT);
+  }, CAT_CANVAS);
 }
 async function waitForPanelMode(page) {
-  await page.waitForFunction((label) => [...document.querySelectorAll(`canvas[aria-label="${label}"]`)]
-    .every((canvas) => canvas.closest('[aria-label="maxwell"]')), CAT);
+  await page.waitForFunction((selector) => [...document.querySelectorAll(selector)]
+    .every((canvas) => canvas.closest('[aria-label="maxwell"]')), CAT_CANVAS);
 }
 /** The flying cat's square, as the page shows it. A modal dialog hides it from role queries. */
-const box = (page) => page.locator(`canvas[aria-label="${CAT}"]`).boundingBox();
+const box = (page) => page.locator(CAT_CANVAS).boundingBox();
+/** Wait, with frames held, until the free cat shows what it is doing. */
+const waitForLabel = (page, label) => page.waitForFunction(([selector, name]) => document.querySelector(selector)?.getAttribute('aria-label') === name, [CAT_CANVAS, label]);
 const viewport = (page) => page.evaluate(() => ({ width: document.documentElement.clientWidth, height: document.documentElement.clientHeight }));
 const liveContexts = (page) => page.evaluate(() => window.maxwellBrowserProbe.contexts - window.maxwellBrowserProbe.lost);
 const draws = (page) => page.evaluate(() => window.maxwellBrowserProbe.draws);
@@ -50,7 +52,6 @@ async function threads(t) {
 }
 /** In-app navigation in every connected tab, without reloading them. */
 const show = (threadId, ...options) => bb('thread', 'open', threadId, ...options);
-const vertical = (image) => { const bounds = contentBounds(image); return (bounds.top + bounds.bottom) / 2; };
 
 test('free and capture reach every connected tab; new and reloaded tabs start in panel mode', async (t) => {
   const { a, b } = await threads(t);
@@ -228,10 +229,10 @@ test('the free cat flies diagonally at a constant pace, bounces off the page edg
     assert.ok(flips.x >= 2 && flips.y >= 2, `The cat must bounce off both pairs of edges (${JSON.stringify(flips)})`);
     assert.ok(Math.max(...paces) - Math.min(...paces) < 0.5, 'The pace must be constant');
     assert.ok(paces[0] > 0, 'The cat must move');
-    // At 24 rpm the rotation and the bob both repeat after 15 seconds, over
-    // which the cat crosses the page and bounces: the image must not change.
+    // Outside a chat the cat dances, repeating every period. Over 17 periods
+    // it crosses the page and bounces: the image must not change.
     const now = await sample(page);
-    const later = await sample(page, 15000);
+    const later = await sample(page, DANCE_PERIOD * 17);
     assert.ok(difference(now, later) < 0.5, 'Bounces must not change the cat');
     assert.ok(contentBounds(first).pixels > 1000, 'The flying cat must be visible');
 
@@ -268,64 +269,140 @@ async function focusRightPane(page) {
   await page.evaluate(() => window.maxwellBrowserProbe.resume());
 }
 
-/** Rendered rotation, compared at whole bob cycles so only the turn can differ. */
-async function assertTurning(page, rpm) {
-  await page.evaluate(() => window.maxwellBrowserProbe.resume());
-  // Let the viewed thread's saved speed arrive.
-  await page.waitForTimeout(1500);
-  await freeze(page);
-  const start = await sample(page);
-  const three = await sample(page, 3000);
-  const six = await sample(page, 3000);
-  const fifteen = await sample(page, 9000);
-  if (rpm === 0) {
-    assert.ok(difference(start, three) < 0.5 && difference(start, six) < 0.5, 'At 0 rpm the cat must not turn');
-  } else if (rpm === 10) {
-    assert.ok(difference(start, three) > 1, 'At 10 rpm the cat must show its other side after three seconds');
-    assert.ok(difference(start, six) < 0.5, 'At 10 rpm the cat must complete a turn in six seconds');
-  } else if (rpm === 24) {
-    assert.ok(difference(start, six) > 1, 'At 24 rpm six seconds must not be a whole turn');
-    assert.ok(difference(start, fifteen) < 0.5, 'At 24 rpm fifteen seconds must be six whole turns');
-  }
-  await page.evaluate(() => window.maxwellBrowserProbe.resume());
-}
-
-test('the free cat turns at the viewed thread\'s saved speed, or 24 rpm without a thread', async (t) => {
+test('the free cat follows the selected chat\'s context, and dances outside chats', async (t) => {
   const { a, b } = await threads(t);
-  await callTool(a, 'maxwell_set_rotation_speed', { rpm: 10 });
-  await callTool(b, 'maxwell_set_rotation_speed', { rpm: 0 });
   const { browser, page } = await openBB();
   try {
+    const served = await serveThreads(page);
+    served.context(a, usage(1));
+    served.context(b, usage(0.25));
     await callTool(a, 'maxwell_free');
     await waitForFree(page);
     await drawing(page);
-    await assertTurning(page, 24);
+    const flying = await page.getByRole('img', { name: CAT }).elementHandle();
+    const settled = async (label, where) => {
+      await waitForLabel(page, label);
+      // Let the viewed chat's reading arrive, then let the change finish.
+      await page.waitForTimeout(1500);
+      await freeze(page);
+      await sample(page, SETTLED);
+      if (label === DANCING) await assertDancing(page, where);
+      return page.evaluate(() => window.maxwellBrowserProbe.resume());
+    };
+    await settled(DANCING, 'on New thread');
+
     await show(a);
     await page.waitForURL(new RegExp(a));
-    await assertTurning(page, 10);
+    await settled(ROTATING, 'in a full chat');
+    await freeze(page);
+    await assertRpm(page, 120, 'in a full chat');
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
     await show(b);
     await page.waitForURL(new RegExp(b));
-    await assertTurning(page, 0);
-
-    // At 0 rpm the bob and the flight continue.
+    await settled(ROTATING);
     await freeze(page);
-    const low = await sample(page);
-    const lowBox = await box(page);
-    const high = await sample(page, 1500);
-    assert.ok(Math.abs(vertical(high) - vertical(low)) > 2, 'The cat must keep bobbing at 0 rpm');
-    assert.notDeepEqual(await box(page), lowBox, 'The cat must keep flying at 0 rpm');
+    await assertRpm(page, 48, 'in a quarter-full chat');
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
 
-    // In split view the focused pane's thread sets the speed.
+    // In split view the focused pane's chat sets the speed.
     await show(a, '--split', 'left');
     await page.waitForURL(new RegExp(a));
-    await assertTurning(page, 10);
+    await settled(ROTATING);
+    await freeze(page);
+    await assertRpm(page, 120, 'with the full chat focused');
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
     await focusRightPane(page);
     await page.waitForURL(new RegExp(b));
-    await assertTurning(page, 0);
+    await settled(ROTATING);
+    await freeze(page);
+    await assertRpm(page, 48, 'with the quarter-full chat focused');
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
 
-    // A saved change for the viewed thread reaches the free cat.
-    await callTool(b, 'maxwell_set_rotation_speed', { rpm: 10 });
-    await assertTurning(page, 10);
+    // Settings show no chat.
+    await page.getByRole('button', { name: /^Settings/ }).first().click();
+    await page.waitForURL(/settings/);
+    await settled(DANCING, 'in settings');
+    assert.equal(await flying.evaluate((canvas) => canvas.isConnected), true, 'Changing motion must keep the same scene');
+  } finally { await browser.close(); }
+});
+
+test('changing between dance and rotation takes about half a second, keeps the flight and survives rapid navigation', async (t) => {
+  const { a, b } = await threads(t);
+  const { browser, page } = await openBB();
+  try {
+    const served = await serveThreads(page);
+    served.context(a, usage(1));
+    served.context(b, usage(0));
+    await callTool(a, 'maxwell_free');
+    await waitForFree(page);
+    await drawing(page);
+    // Change what the free cat shows while its frames are held, so the change
+    // starts at a known scene time.
+    const change = async (go, label) => {
+      await freeze(page);
+      await go();
+      await waitForLabel(page, label);
+      await page.waitForTimeout(1500);
+    };
+    const flight = async (count) => {
+      const boxes = [];
+      for (let index = 0; index < count; index++) { await sample(page, 20); boxes.push(await box(page)); }
+      return boxes;
+    };
+    // Away from the edges, each 20 ms frame moves the cat 2 px along both axes.
+    const assertSteadyFlight = async (boxes) => {
+      const { width, height } = await viewport(page);
+      const steps = boxes.slice(1).map((item, index) => [boxes[index], item]).filter(([from, to]) => [from, to].every((item) =>
+        Math.min(item.x, width - item.x - item.width, item.y, height - item.y - item.height) > 3));
+      assert.ok(steps.length >= 2, 'The cat must fly away from the edges for the check');
+      for (const [from, to] of steps) {
+        assert.ok(Math.abs(Math.abs(to.x - from.x) - 2) < 0.5 && Math.abs(Math.abs(to.y - from.y) - 2) < 0.5, `The flight must keep its pace while the motion changes (${JSON.stringify([from, to])})`);
+      }
+    };
+
+    await freeze(page);
+    const dancing = await frames(page, 22, 43);
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
+    // Dance to 120 rpm: three seconds are six turns and one bob.
+    await change(() => show(a), ROTATING);
+    const toTurning = await frames(page, 100, 50);
+    const turnedAfter = settledAfter(toTurning, 50, 3000);
+    assert.ok(turnedAfter >= 250 && turnedAfter <= 700, `Starting to rotate must take about 0.5 s (${turnedAfter} ms)`);
+    assert.ok(largestStep(toTurning.slice(0, 4)) < largestStep(toTurning.slice(-10)), 'Rotation must start slowly, not at full speed');
+    await assertRpm(page, 120, 'after the change');
+    const fullSpeed = await frames(page, 12, 43);
+
+    // Back to the dance: it repeats every period once the change is over.
+    await change(() => page.getByRole('button', { name: /^New thread \(/ }).click(), DANCING);
+    const boxes = await flight(5);
+    const toDancing = await frames(page, 63, 43);
+    const dancedAfter = settledAfter(toDancing, 43, DANCE_PERIOD);
+    assert.ok(dancedAfter >= 250 && dancedAfter <= 700, `Starting to dance must take about 0.5 s (${dancedAfter} ms)`);
+    assert.ok(largestStep(toDancing.slice(-21)) <= largestStep(dancing) * 1.5 + 0.5, 'The dance must reach its usual motion');
+    assert.ok(largestStep(toDancing) <= largestStep(fullSpeed) * 1.25 + 0.5, 'Turning to face the viewer must not whirl faster than a full context');
+    await assertSteadyFlight(boxes);
+    await assertSteadyFlight(await flight(5));
+    await assertDancing(page, 'after the change');
+
+    // From the slowest rotation the cat speeds up to face the viewer, but no faster than a full context.
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
+    await change(() => show(b), ROTATING);
+    await sample(page, SETTLED);
+    await change(() => page.getByRole('button', { name: /^New thread \(/ }).click(), DANCING);
+    assert.ok(largestStep(await frames(page, 24, 43)) <= largestStep(fullSpeed) * 1.25 + 0.5, 'Turning to face the viewer from 24 rpm must not whirl');
+
+    // A new target in the middle of a change continues from the current motion.
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
+    await change(() => show(a), ROTATING);
+    const half = await frames(page, 6, 43);
+    await change(() => show(b), ROTATING);
+    const next = await frames(page, 6, 43);
+    await change(() => page.getByRole('button', { name: /^New thread \(/ }).click(), DANCING);
+    const last = await frames(page, 30, 43);
+    const steps = [half, next, last].map((images) => largestStep(images));
+    const joins = [difference(half.at(-1), next[0]), difference(next.at(-1), last[0])];
+    assert.ok(Math.max(...joins) <= Math.max(...steps) * 1.5 + 0.5, `Retargeting must not jump (${joins} against ${steps})`);
+    await page.evaluate(() => window.maxwellBrowserProbe.resume());
   } finally { await browser.close(); }
 });
 
@@ -402,7 +479,7 @@ test('the free cat is drawn above a BB dialog, and only its square takes the poi
     }
     const covered = overlap(cat, dialogBox);
     assert.ok(covered.width > 60 && covered.height > 60, 'The cat must reach the dialog');
-    assert.equal((await topmost(covered.x + covered.width / 2, covered.y + covered.height / 2)).cat, CAT, 'The cat must be above the dialog');
+    assert.match((await topmost(covered.x + covered.width / 2, covered.y + covered.height / 2)).cat ?? '', CAT, 'The cat must be above the dialog');
     // Away from the cat, the dialog keeps the pointer.
     const corners = [[12, 12], [dialogBox.width - 12, 12], [12, dialogBox.height - 12], [dialogBox.width - 12, dialogBox.height - 12]]
       .map(([x, y]) => ({ x: dialogBox.x + x, y: dialogBox.y + y }))
@@ -449,7 +526,7 @@ test('repeated freeing and capturing, hiding and disabling the plugin leave no s
     await drawing(page);
 
     assert.ok((await plugin('/maxwell/disable')).ok());
-    await page.waitForFunction((label) => !document.querySelector(`canvas[aria-label="${label}"]`), CAT);
+    await page.waitForFunction((selector) => !document.querySelector(selector), CAT_CANVAS);
     await assertNotDrawing(page);
     assert.equal(await liveContexts(page), 0, 'Disabling the plugin must release the free scene');
     await page.waitForFunction(() => window.maxwellBrowserProbe.pendingFrames() === 0);

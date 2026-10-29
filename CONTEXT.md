@@ -14,9 +14,14 @@ Rozszerzenie OpenChamber z projektu m3nowak/och-plugin-demo, do którego odnosi 
 **Obrót Maxwella**:
 Obrót kota z prawa do lewa, przeciwny do obrotu szczura we wzorcu.
 
+**Taniec Maxwella**:
+Symetryczne, rytmiczne kołysanie Maxwella na boki względem własnego ciała, w stałym tempie i z ciągłym oparciem dolnej części ciała o stałe podłoże, jak karton kołysany na stole. Boki odnoszą się do kota, nie do perspektywy widza; ruch środka ciała wynika jedynie ze zmiany podparcia.
+
+**Aktywny czat**:
+Oglądana rozmowa BB, w której wysłano już pierwszą wiadomość, niezależnie od tego, czy agent aktualnie pracuje.
+
 **Prędkość obrotu Maxwella**:
-Liczba obrotów kota na minutę, przypisana do wątku BB i wspólna dla jego agentów.
-Wartość 0 oznacza zatrzymanie obrotu; dodatnie wartości zachowują jego kierunek.
+Liczba obrotów kota na minutę, zależna od zapełnienia okna kontekstowego aktywnego czatu.
 
 **Panel Maxwella**:
 Widok kota obok czatu BB, dostępny przez Actions w istniejącym wątku oraz podczas przygotowywania nowego wątku.

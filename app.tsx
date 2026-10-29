@@ -15,10 +15,10 @@ export default definePluginApp((app) => {
     ...panel,
     context: { kind: 'thread' },
     availability: 'action',
-    // A new thread gets a new scene, so no angle or speed carries over.
+    // A new thread gets a new scene, so no pose or speed carries over.
     component: ({ threadId }) => <MaxwellPanel key={threadId} threadId={threadId} />,
   });
-  // Before a thread exists there is no saved speed to follow.
+  // Before a thread exists there is no conversation, so Maxwell dances.
   app.slots.experimental_newThreadPanelAction({ ...panel, component: () => <MaxwellPanel /> });
   // One player per BB tab, outliving panels, threads and scenes.
   app.contentScripts.register({ id: 'music', mount: mountMaxwellMusic });

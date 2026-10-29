@@ -14,8 +14,9 @@ default SwiftShader flags, for example with
 `--no-sandbox --use-angle=gl-egl --ignore-gpu-blocklist` for a hardware GPU.
 
 The suite covers locally bundled assets, missing WebGL, invalid image data,
-context loss, attribution retention, 24 rpm rotation and vertical motion at 20 cycles per minute under both
-motion preferences, framing, theme changes, hidden views and repeated closing.
+context loss, attribution retention, rotation with its vertical bob at 20
+cycles per minute under both motion preferences, the dance, framing, theme
+changes, hidden views and repeated closing.
 Rendering tests fail on unusable graphics hardware, rather than skipping.
 
 Music checks observe the browser media boundary: `playing` events, advancing
@@ -74,31 +75,10 @@ rendered-motion check still cannot reach a visible scene on this host.
 
 ## Rotation speed tool (issue #3)
 
-`tool.test.mjs` covers the agent tool contract at the SDK host boundary: one
-registered setter exposed without selection rules, the saved rpm returned
-unrounded for 0, 0.5, 240.25 and extreme finite values, the 24 rpm default,
-rejection of missing, negative, non-numeric, non-finite and thread-targeting
-input without a state change, a missing thread identity, an injected save
-failure, thread sharing and isolation, competing saves converging on the last
-saved value and revision, and retention across a plugin reload.
-
-BB's live tool route accepts only authenticated host daemon sessions, so the
-browser suite cannot call the tool directly. One manual live check in BB
-0.47.1 asked a Claude Code agent in a scratch thread to call the installed
-tool with 0.5 rpm. The tool returned `{"rpm":0.5}`, the thread's saved speed
-became 0.5, a browser viewing that thread's panel received the update on the
-thread's channel and a second client viewing another thread kept 24 rpm.
-
-Not verified here:
-
-- Rendered speed: 0.5 rpm taking two minutes per revolution, 60 rpm after
-  opening a panel, angle retention on change, zero rpm with bobbing, and
-  extreme speeds. The rendering limitation above still applies.
-- An actual BB restart and an agent-session reset. Speed is keyed only by
-  thread in BB's plugin storage, and reload retention is tested.
-- Two browser clients converging on competing live changes. The panel keeps
-  the highest revision from its read and from realtime signals, and rereads
-  after every reconnection.
+Removed by [issue #9](https://github.com/m3nowak/bb-plugin-maxwell/issues/9):
+the speed now follows the viewed chat's context, as recorded in
+[ADR 0004](adr/0004-context-driven-maxwell-motion.md). `tool.test.mjs` checks
+that the setter is gone and that speeds saved by earlier versions are not read.
 
 ## Music verification (issue #5)
 
@@ -162,8 +142,8 @@ The browser checks cover:
   thread.
 - Diagonal flight at a constant pace, edge-only reversals on both axes,
   unchanged images across bounces, and resizing down to 240×180.
-- Speed from the route's thread, the focused split pane, live changes, and
-  24 rpm on New thread. At 0 rpm the cat still bobs and flies.
+- Motion from the route's chat and the focused split pane, and the dance on
+  New thread and in settings (see issue #9 below).
 - Clicks on the cat, not its empty square, playing music. Playback continues
   across free, capture and repeated free. Free after a reload stays silent.
 - The cat above BB's Ctrl+K dialog, with the dialog keeping the pointer
@@ -189,3 +169,175 @@ checks fail identically against `main` on the same BB.
 A real Claude Code or Codex agent did not call the tools. The scripted agent
 reached them through BB's provider path, and both appeared in its session's
 tool list with their descriptions.
+
+## Context-driven motion and the dance (issue #9)
+
+`motion.test.mjs` and the two motion tests in `free.test.mjs` supply known
+context readings at BB's public thread routes. Playwright answers
+`/api/v1/threads/:id/context` with a chosen reading, a failure or a delayed
+reply, and `/conversation-outline` with no messages for an empty thread.
+Thread changes come from real driver turns (`bb thread tell`) and a real
+`bb thread clear`. The motion is measured in rendered pixels with frames held
+by the probe, which also reports each scene's clock from its first drawn frame.
+
+A speed is accepted only when one and twenty whole turns return the same
+image and 1/2, 1/3, 1/4 and 1/5 of a turn do not. Twenty turns expose an
+error of about 1%, such as rounding to whole percents. Both images are taken
+where the three-second bob is at the same height. The chest's light pixels must cross the
+view from right to left. The dance must repeat after 903 ms and after 20 more
+periods, visibly lean to both sides, and keep the chest
+in view in every frame. The probe also observes the model-view matrices sent
+to WebGL. The model's head-to-tail direction must stay fixed while it rolls
+to both sides. Angles half a period apart must be equal and opposite. The
+lowest transformed solid-body vertex must stay at the same floor height,
+without floating or penetrating it. The current contact vertex must also
+stay stationary over a 0.1 ms step, rejecting sliding. These are body-relative assertions, not
+screen-relative ones. It must also fit the frame. A change
+must start repeating its new motion within 250–700 ms. Consecutive frames,
+and frames taken either side of a new target in mid-change, must not jump.
+Turning to face the viewer, from 24 or 120 rpm, must not change the image
+between frames much more than a full context's rotation does.
+
+The dance period was measured from the swaying parts of the
+[reference video](https://www.youtube.com/watch?v=rXh8Hvo7gfs) (0–3.6 s and
+7.2–14.5 s at 24 fps). The cat's horizontal centre was fitted against
+candidate periods: 0.9055 s over the first part and 0.9030 s over the longer
+second part. One full sway takes 903 ms. The initial choreography also
+copied the reference's asymmetric hop and lean. The user subsequently asked
+for a symmetric sway in place instead, so only the reference's tempo is
+retained. The plugin keeps Maxwell facing the viewer, as the issue requires.
+
+The plugin uses roll around the model's local Z axis, which runs along its
+body, with a sinusoidal amplitude of ±0.2 radians. The solid body's lower
+convex hull determines support on a fixed, invisible floor. Vertical
+correction prevents floating or penetration; integrating the support height
+over roll gives lateral motion without slipping, just as a carton pivots
+around its bottom edge. There is no independent hop or lateral animation.
+Both modes use the same camera framing, avoiding a zoom during transitions.
+Yaw and pitch oscillations are not part of the dance. The screen projection can change
+shape during a body-relative lean, so constant silhouette area is not an
+acceptance criterion.
+
+The dance test writes one period of frames to `artifacts/dance-*.png`, and
+the speed test writes quarter turns to `artifacts/rotation-*.png`. Compare
+the dance frames in order with one period of the reference's swaying part.
+
+The checks cover:
+
+- 24, 48, 72, 96 and 120 rpm at 0, 25, 50, 75 and 100% of the window, 54 rpm
+  at 31.25% of a 128k window, and 120 rpm beyond the window. 24 rpm and its
+  direction are also checked with reduced motion.
+- A failed read before any reading (24 rpm). After a valid reading, a failed
+  read, no usage, negative tokens, a zero, negative or non-numeric window
+  keep 72 rpm. A valid empty reading gives 24 rpm.
+- A new reading in the middle of a speed change, which keeps the speed
+  continuous and settles at the new reading.
+- A drop after compaction, the same tokens in a smaller model window, and a
+  clear. A read sent before the clear and answered after it is discarded,
+  leaving 24 rpm until a new reading.
+- Separate chats, a child agent's own chat, returning to a chat whose reads now
+  fail (its last reading in the tab applies), a late reply for the chat just
+  left, a second tab, and a reload.
+- A missed change read again after the realtime socket reconnects.
+- The dance on New thread, in an empty thread and with music playing, then
+  rotation once the first message is sent and while the agent waits.
+- The free cat following the route's chat, the focused split pane and
+  settings, with one scene throughout. Its flight keeps its pace while the
+  motion changes, and rapid navigation does not jump.
+
+BB 0.48 shows one side panel in split view, so two Maxwell panels cannot be
+placed side by side. A panel follows the thread its tab belongs to.
+
+`tool.test.mjs` checks that `maxwell_set_rotation_speed` is no longer
+registered and that no RPC serves the speeds earlier versions saved,
+including 0 and 240.25 rpm.
+
+### Verification in this checkout
+
+BB 0.48.0 and Plugin SDK 0.6.79 ran in a dedicated instance with the driver
+agent, with Chromium headless shell 1248 using hardware ANGLE
+(`--no-sandbox --use-angle=gl-egl --ignore-gpu-blocklist`). Build and
+typecheck pass. The full suite ran 37 tests: 34 passed and 3 failed. All
+motion, free, music, failure-rendering and tool tests pass.
+
+The three failures are not caused by this change:
+
+- `lifecycle.test.mjs:27` and the existing-thread check's missing "Ask
+  anything." composer (`panel.test.mjs:91`) are the failures recorded for
+  issue #7.
+- The attribution link check (`failures.test.mjs:78`) now opens a popup with
+  no URL. It fails the same way when `main` is installed on the same BB
+  0.48.0, which suggests BB's link handling changed since 0.47.1.
+
+During the initial implementation, the dance frames were compared with the
+reference's rest, hop, hold, return and lean. That shape has since been
+replaced by the user's requested symmetric sway in place.
+
+Turning to face the viewer was simulated separately for 5,000 random speeds,
+angles and earlier changes. It never turned back, always ended facing the
+camera, and took 0.4–0.7 s, peaking at 145 rpm only when entered from close
+to 120 rpm. The browser checks bound its frame-to-frame change by that of a
+full context.
+
+Not verified here:
+
+- Compaction and model changes made by a real provider. The driver agent
+  does not support manual compaction (BB answers HTTP 409), so a compaction
+  is a lower reading after a turn, and a model change a different window.
+- Context readings reported by a real Claude Code or Codex agent.
+- Two Maxwell panels side by side, which BB 0.48 does not offer.
+
+### Body-relative dance correction in PR #11
+
+The first correction removed dance yaw and pitch, but still applied roll
+and sideways offsets relative to the viewer. Its silhouette-area assertion
+checked the wrong requirement. The user clarified that the sway is relative
+to Maxwell's own body, not the screen.
+
+The replacement WebGL transform assertion fails on that version with
+"The cat must roll about its own head-to-tail axis, not the viewer's axis".
+Changing the Euler order from ZXY to YXZ makes roll follow the cat's heading;
+rotating the sideways offset by that heading also keeps translation across
+the body. The targeted browser test then passes on New thread, with music
+and in an empty chat, and verifies rotation after the first message. The
+hop, 903 ms tempo and smooth transitions are retained. Build and typecheck
+pass, as do the six package and tool tests.
+
+### Symmetric sway in place
+
+This intermediate correction was superseded by the grounded rocking below.
+
+The user removed the asymmetric hop and lateral displacement from the
+requirements. The dance now uses a single sine wave, ±0.2 radians around
+the same body axis, with the 903 ms period unchanged. Its centre stays at
+rest; the vertical bob still applies during rotation only. Camera framing
+is constant between modes.
+
+The browser regression checks all 24 poses for a fixed WebGL translation,
+and each pair half a period apart for equal and opposite roll. It rejects
+the previous choreography with "The dancing cat must stay in place, without
+sideways movement or hopping", then passes with the new sway, including
+with music and in an empty chat. The two extreme poses must also differ in
+rendered pixels. Build, typecheck and the six package/tool tests pass.
+
+### Grounded rocking
+
+The user clarified the intended motion with a milk carton rocked on a
+table: the body must always touch the floor. A fixed model centre was the
+wrong constraint, so the test now checks the contact instead. The floor is
+virtual; no visible plane was added to the panel.
+
+`grounding.ts` uses solid-body vertices, not transparent whisker planes.
+It finds the supporting part of the lower cross-section at each roll angle
+and integrates its height exactly between changes of support. The centre
+therefore follows the supporting edge without sliding. Angular symmetry,
+±0.2 radians, the 903 ms tempo and smooth mode changes remain unchanged.
+
+The new browser floor-contact assertion fails on the fixed-centre version
+and passes on the grounded version, including music and empty chats. The
+same check verifies no-slip contact as well as rendered motion, framing,
+body-relative roll and angular symmetry. A separate box calculation checked
+401 angles and kept the selected bottom edge fixed to within 1e-12 model
+units. Build, typecheck and the six package/tool tests pass.
+The additional browser checks for the selected chat, free-cat transitions
+and the 24–120 rpm rotation scale all pass together.
