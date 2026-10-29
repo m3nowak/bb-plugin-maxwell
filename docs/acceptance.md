@@ -186,7 +186,10 @@ error of about 1%, such as rounding to whole percents. Both images are taken
 where the three-second bob is at the same height. The chest's light pixels must cross the
 view from right to left. The dance must repeat after 903 ms and after 20 more
 periods, sway right and then left by over a quarter of the cat's width, and
-keep the chest in view in every frame. It must also fit the frame. A change
+keep the chest in view in every frame. Its largest rendered silhouette area
+must be less than 1.1 times its smallest, rejecting the foreshortening of
+front-to-back rocking even when its centre moves sideways. It must also fit
+the frame. A change
 must start repeating its new motion within 250–700 ms. Consecutive frames,
 and frames taken either side of a new target in mid-change, must not jump.
 Turning to face the viewer, from 24 or 120 rpm, must not change the image
@@ -202,6 +205,10 @@ a return in each half. One half is a hop up and to the right, about a quarter
 of the cat's width across and two fifths of its height up; the other is a lean
 down to the left. The reference shows Maxwell in three-quarter view; the
 plugin keeps him facing the viewer, as the issue requires.
+
+The plugin uses sideways roll for these beats, without the yaw and pitch
+oscillations in the first implementation. Those made him rock toward and
+away from the viewer despite the sideways movement of his centre.
 
 The dance test writes one period of frames to `artifacts/dance-*.png`, and
 the speed test writes quarter turns to `artifacts/rotation-*.png`. Compare
@@ -271,3 +278,12 @@ Not verified here:
   is a lower reading after a turn, and a model change a different window.
 - Context readings reported by a real Claude Code or Codex agent.
 - Two Maxwell panels side by side, which BB 0.48 does not offer.
+
+### Sideways dance correction in PR #11
+
+The strengthened rendered-area check failed on the original dance with a
+largest/smallest silhouette area ratio of 1.288. Removing pitch alone still
+failed at 1.263. Removing both dance yaw and pitch, while retaining roll,
+sideways offsets, the hop and the 903 ms period, reduced it to 1.019. The
+targeted browser test passes on New thread, with music and in an empty chat,
+then verifies rotation after the first message. Build and typecheck pass.

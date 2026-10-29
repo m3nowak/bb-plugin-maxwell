@@ -117,6 +117,12 @@ export async function assertDancing(page, where = '') {
     const bounds = contentBounds(image);
     assert.ok(bounds.left > 2 && bounds.top > 2 && bounds.right < image.width - 3 && bounds.bottom < image.height - 3, `The whole dancing cat must stay in view ${where}`);
   }
+  // A sideways lean rotates the silhouette without foreshortening it. Merely
+  // moving its centre left and right also passes when the cat pitches toward
+  // and away from the viewer, so check its rendered area as well.
+  const areas = images.map((image) => contentBounds(image).pixels);
+  const areaRatio = Math.max(...areas) / Math.min(...areas);
+  assert.ok(areaRatio < 1.1, `The cat must lean sideways, not rock toward and away from the viewer (silhouette area ratio ${areaRatio.toFixed(3)}) ${where}`);
   const centres = images.map(centre);
   const width = contentBounds(images[0]).right - contentBounds(images[0]).left;
   assert.ok(Math.max(...centres) - Math.min(...centres) > width * 0.25, `The cat must sway sideways ${where}`);

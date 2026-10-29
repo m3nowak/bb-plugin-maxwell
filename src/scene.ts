@@ -71,7 +71,7 @@ export function mountMaxwellScene(
     if (!running) return;
     const elapsed = previousTime === null ? 0 : time - previousTime;
     const pose = motion.advance(elapsed);
-    cat.rotation.set(pose.pitch, pose.yaw, pose.roll);
+    cat.rotation.set(0, pose.yaw, pose.roll);
     cat.position.set(pose.x * radius, pose.y * radius, 0);
     if (pose.reach !== reach) {
       reach = pose.reach;

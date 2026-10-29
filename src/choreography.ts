@@ -18,12 +18,13 @@ const BOB = 0.105;
 const FRONT = 0.6;
 
 /**
- * The two beats of the sway, at their extremes: a hop up to the right with
- * the head raised, then a lean down to the left with the head lowered.
+ * The two beats of the sway, at their extremes: a hop up to the right,
+ * then a lean down to the left. Tilt sideways only, keeping the same view
+ * of the face instead of rocking toward and away from the viewer.
  * Offsets are fractions of the model's radius, angles in radians.
  */
-const HOP = { x: 0.26, y: 0.36, yaw: -0.2, pitch: -0.17, roll: 0.17 };
-const LEAN = { x: -0.28, y: 0.06, yaw: 0.2, pitch: 0.12, roll: -0.24 };
+const HOP = { x: 0.26, y: 0.36, roll: 0.17 };
+const LEAN = { x: -0.28, y: 0.06, roll: -0.24 };
 /** Furthest the dance moves the cat's centre. */
 const DANCE_REACH = Math.max(...[HOP, LEAN].map(({ x, y }) => Math.hypot(x, y)));
 
@@ -99,7 +100,7 @@ function sway(time: number) {
   const q = (phase % 0.5) * 2;
   // Measured from the reference: a short rest, a quick move, a hold, and back.
   const k = between(0.15, 0.5, q) - between(0.68, 1, q);
-  return { x: beat.x * k, y: beat.y * k, yaw: beat.yaw * k, pitch: beat.pitch * k, roll: beat.roll * k };
+  return { x: beat.x * k, y: beat.y * k, roll: beat.roll * k };
 }
 
 export interface Pose {
@@ -108,9 +109,8 @@ export interface Pose {
   y: number;
   /** Furthest the centre can be from rest in the current blend of motions, as a fraction of the radius. */
   reach: number;
-  /** Radians, applied as yaw, then pitch, then roll. */
+  /** Radians, applied as yaw, then sideways roll. */
   yaw: number;
-  pitch: number;
   roll: number;
 }
 
@@ -167,8 +167,7 @@ export function choreograph() {
         x: dance * step.x,
         y: (1 - dance) * Math.sin(bobPhase) * BOB + dance * step.y,
         reach: (1 - dance) * BOB + dance * DANCE_REACH,
-        yaw: position * 2 * Math.PI + dance * step.yaw,
-        pitch: dance * step.pitch,
+        yaw: position * 2 * Math.PI,
         roll: dance * step.roll,
       };
     },
