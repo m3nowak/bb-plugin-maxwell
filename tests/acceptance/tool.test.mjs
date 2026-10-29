@@ -6,6 +6,7 @@ import { createFakePluginHost } from '@get-bb/plugin-sdk/testing';
 import plugin from '../../dist/server.js';
 
 const TOOL = 'maxwell_set_rotation_speed';
+const MODE_TOOLS = ['maxwell_free', 'maxwell_capture'];
 
 async function load(wrap = (bb) => bb) {
   const host = createFakePluginHost({ pluginId: 'maxwell', experimental_declaredIconNames: ['cat-head'] });
@@ -21,13 +22,13 @@ async function load(wrap = (bb) => bb) {
 }
 const text = (result) => typeof result === 'string' ? result : result.content.map((part) => part.text).join('');
 
-test('one rpm setter is registered, with a required numeric rpm and no thread argument', async () => {
+test('the rpm setter, free and capture are registered and exposed without selection rules', async () => {
   const { host, lifecycle } = await load();
   try {
     const tools = host.harness.inspection.registrations.agentTools.map((tool) => tool.name);
-    assert.deepEqual(tools, [TOOL]);
+    assert.deepEqual(tools.toSorted(), [TOOL, ...MODE_TOOLS].toSorted());
     const configuration = await host.harness.behavior.resolveAgentConfiguration();
-    assert.deepEqual(configuration.tools.map((tool) => tool.name ?? tool), [TOOL], 'The tool must be exposed without selection rules');
+    assert.deepEqual(configuration.tools.map((tool) => tool.name ?? tool).toSorted(), tools.toSorted(), 'The tools must be exposed without selection rules');
   } finally { await lifecycle.dispose(); }
 });
 
@@ -134,5 +135,58 @@ test('saved speed survives a plugin reload', async () => {
     await set('thr_a', { rpm: 60 });
     const reloaded = await host.harness.lifecycle.reload(plugin);
     assert.equal((await reloaded.harness.behavior.callRpc('speed', { threadId: 'thr_a' })).rpm, 60);
+  } finally { await lifecycle.dispose(); }
+});
+
+const commands = (host) => host.harness.inspection.realtimeSignals.filter((signal) => signal.channel === 'mode').map((signal) => signal.payload);
+
+test('free and capture take no arguments and reject any', async () => {
+  const { host, lifecycle } = await load();
+  try {
+    for (const name of MODE_TOOLS) {
+      for (const input of [{ mode: 'free' }, { threadId: 'thr_b' }, { projectId: 'proj_2' }]) {
+        await assert.rejects(host.harness.behavior.callAgentTool(name, input, { threadId: 'thr_a' }), /arguments are invalid/, `${name} must reject ${JSON.stringify(input)}`);
+      }
+    }
+    assert.deepEqual(commands(host), [], 'A rejected call must not send a command');
+  } finally { await lifecycle.dispose(); }
+});
+
+test('every free and capture publishes its target mode, whatever the calling thread or project', async () => {
+  const { host, saved, lifecycle } = await load();
+  try {
+    const call = (name, context) => host.harness.behavior.callAgentTool(name, {}, { signal: new AbortController().signal, ...context });
+    const results = [
+      await call('maxwell_free', { threadId: 'thr_a', projectId: 'proj_1' }),
+      // A repeat is sent too: the server cannot know which tabs already have it.
+      await call('maxwell_free', { threadId: 'thr_b', projectId: 'proj_2' }),
+      await call('maxwell_capture', { threadId: 'thr_a', projectId: 'proj_2' }),
+      await call('maxwell_capture', {}),
+      await call('maxwell_free', {}),
+    ];
+    assert.deepEqual(commands(host), [{ mode: 'free' }, { mode: 'free' }, { mode: 'panel' }, { mode: 'panel' }, { mode: 'free' }]);
+    assert.deepEqual(results, [
+      'Maxwell has been freed.', 'Maxwell has been freed.',
+      'Maxwell has been captured.', 'Maxwell has been captured.',
+      'Maxwell has been freed.',
+    ], 'A published command reports only that Maxwell was freed or captured');
+    assert.equal(await saved('thr_a'), 24, 'Commands must not change any rotation speed');
+  } finally { await lifecycle.dispose(); }
+});
+
+test('a failed publication is reported as an error, not as a sent command', async () => {
+  let failing = true;
+  const { host, lifecycle } = await load((bb) => ({
+    ...bb,
+    realtime: { publish: (...args) => failing ? (() => { throw new Error('socket closed'); })() : bb.realtime.publish(...args) },
+  }));
+  try {
+    for (const name of MODE_TOOLS) {
+      const result = await host.harness.behavior.callAgentTool(name, {}, { threadId: 'thr_a' });
+      assert.equal(result.isError, true);
+      assert.match(text(result), /^Maxwell could not be (freed|captured)\.$/);
+    }
+    failing = false;
+    assert.equal(typeof await host.harness.behavior.callAgentTool('maxwell_free', {}, { threadId: 'thr_a' }), 'string');
   } finally { await lifecycle.dispose(); }
 });

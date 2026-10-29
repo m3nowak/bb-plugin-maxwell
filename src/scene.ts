@@ -18,12 +18,20 @@ export interface MaxwellScene {
   dispose(): void;
 }
 
+export interface MaxwellSceneOptions {
+  report: (message: string | null) => void;
+  onCatClick: () => void;
+  /** Told how to start over after a failure, such as reopening the panel. */
+  retry: string;
+  /** Advance other motion by the milliseconds each drawn frame covers. */
+  onFrame?: (elapsed: number) => void;
+}
+
 /** Owns one visible scene and all of its graphics resources. */
 export function mountMaxwellScene(
   stage: HTMLElement,
   canvas: HTMLCanvasElement,
-  report: (message: string | null) => void,
-  onCatClick: () => void,
+  { report, onCatClick, retry, onFrame }: MaxwellSceneOptions,
 ): MaxwellScene {
   let renderer: WebGLRenderer;
   try {
@@ -71,13 +79,14 @@ export function mountMaxwellScene(
       cat.rotation.y = turn * 2 * Math.PI;
       bobPhase = (bobPhase + elapsed * BOB_PER_MS) % (2 * Math.PI);
       cat.position.y = Math.sin(bobPhase) * bobAmplitude;
+      onFrame?.(elapsed);
     }
     previousTime = time;
     try { renderer.render(scene, camera); }
     catch {
       // Three schedules its next frame after this callback returns. Cancel
       // after that scheduling so a thrown draw cannot leave an idle RAF loop.
-      queueMicrotask(() => fail('The 3D view stopped because rendering failed. Reopen the panel to try again.'));
+      queueMicrotask(() => fail(`The 3D view stopped because rendering failed. ${retry}`));
     }
   };
   const updateLoop = () => {
@@ -158,7 +167,7 @@ export function mountMaxwellScene(
   };
   const contextLost = (event: Event) => {
     event.preventDefault();
-    fail('The 3D view stopped because the graphics device was reset. Reopen the panel to try again.');
+    fail(`The 3D view stopped because the graphics device was reset. ${retry}`);
   };
   canvas.addEventListener('webglcontextlost', contextLost);
   canvas.addEventListener('click', click);
@@ -200,7 +209,7 @@ export function mountMaxwellScene(
       ready = true;
       resize();
       report(null);
-    } catch { fail('The Maxwell model could not be loaded. Reopen the panel to try again.'); }
+    } catch { fail(`The Maxwell model could not be loaded. ${retry}`); }
   };
   void load();
   return {

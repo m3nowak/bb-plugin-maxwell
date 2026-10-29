@@ -1,4 +1,5 @@
 import { definePluginApp } from '@get-bb/plugin-sdk/app';
+import { MaxwellOverlay } from './src/MaxwellOverlay';
 import { MaxwellPanel } from './src/MaxwellPanel';
 import { mountMaxwellMusic } from './src/music';
 import './src/panel.css';
@@ -21,4 +22,6 @@ export default definePluginApp((app) => {
   app.slots.experimental_newThreadPanelAction({ ...panel, component: () => <MaxwellPanel /> });
   // One player per BB tab, outliving panels, threads and scenes.
   app.contentScripts.register({ id: 'music', mount: mountMaxwellMusic });
+  // One receiver of free and capture per BB tab, and the flying cat when free.
+  app.slots.experimental_appOverlay({ id: 'free', component: MaxwellOverlay });
 });

@@ -121,3 +121,71 @@ nothing with the default SwiftShader flags.
   panel. The existing-thread check found no "Ask anything." composer in a
   thread with a running turn.
 - Nobody listened to the recording during this verification.
+
+## Free and capture (issue #7)
+
+`free.test.mjs` drives Uwolnienie and Schwytanie Maxwella through real agent
+turns. `tests/acceptance/driver/agent.mjs` is a scripted ACP agent. It reads
+each prompt's last line as a tool name with optional JSON arguments and calls
+that tool through the MCP server BB gives its session. The command therefore
+takes BB's own path: provider, host daemon, server, the plugin's tool, then BB
+realtime to the tabs. Tests never set frontend state directly.
+
+The suite disables the plugin, navigates every connected BB window with
+`bb thread open` and spawns threads. Run it against a dedicated BB, not one
+in daily use:
+
+```sh
+bb-app --bundled --no-in-app-updates --data-dir /tmp/bb-maxwell-test \
+  --server-bind-host 127.0.0.1 --server-port 39888 --host-daemon-port 39889 &
+export BB_SERVER_URL=http://127.0.0.1:39888 MAXWELL_BB_URL=http://127.0.0.1:39888
+bb plugin install "$PWD" --yes
+bb plugin config provider-acp set customAgents \
+  "[{\"id\":\"maxwell-driver\",\"displayName\":\"Maxwell driver\",\"command\":\"node\",\"args\":[\"$PWD/tests/acceptance/driver/agent.mjs\"]}]"
+bb project create --name proj-a --root /tmp/maxwell-proj-a --machine <host-id>
+bb project create --name proj-b --root /tmp/maxwell-proj-b --machine <host-id>
+export MAXWELL_DRIVER_PROJECTS=<proj-a-id>,<proj-b-id>
+```
+
+Skip onboarding once in the browser. Each test spawns two driver threads,
+one per project, and archives them when it ends.
+
+The browser checks cover:
+
+- Delivery to tabs viewing different projects, a reload and a new tab starting
+  in panel mode, repeated free and capture reaching those tabs, and capture
+  opening no panels.
+- A capture missed while the realtime socket is cut, which is not replayed
+  after reconnecting, followed by a capture that applies.
+- One free scene per tab, which persists while a panel opens and closes
+  during free, and through navigation between projects, split view and New
+  thread.
+- Diagonal flight at a constant pace, edge-only reversals on both axes,
+  unchanged images across bounces, and resizing down to 240×180.
+- Speed from the route's thread, the focused split pane, live changes, and
+  24 rpm on New thread. At 0 rpm the cat still bobs and flies.
+- Clicks on the cat, not its empty square, playing music. Playback continues
+  across free, capture and repeated free. Free after a reload stays silent.
+- The cat above BB's Ctrl+K dialog, with the dialog keeping the pointer
+  elsewhere.
+- Repeated transitions, hiding the tab and disabling the plugin, with no
+  leftover scenes, render loops or contexts. Re-enabling starts in panel mode.
+
+`tool.test.mjs` adds the SDK host contract for both tools: registration
+without selection rules, rejected arguments, a published `mode` command for
+every call whatever the thread or project, and a failed publication reported
+as an error.
+
+### Verification in this checkout
+
+BB 0.47.1 and Plugin SDK 0.6.79 ran in a dedicated instance, with Chromium
+using hardware ANGLE (`--no-sandbox --use-angle=gl-egl --ignore-gpu-blocklist`).
+Build and typecheck pass. The full suite ran 36 tests: 34 passed and 2 failed.
+All eight free tests and all twelve tool tests pass. The two failures are the
+existing visibility check (`lifecycle.test.mjs:27`) and the existing-thread
+check's missing "Ask anything." composer (`panel.test.mjs:84`). The same
+checks fail identically against `main` on the same BB.
+
+A real Claude Code or Codex agent did not call the tools. The scripted agent
+reached them through BB's provider path, and both appeared in its session's
+tool list with their descriptions.

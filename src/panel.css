@@ -14,3 +14,9 @@
 .maxwell-attribution { text-align: center; flex: none; margin: 0; padding: 12px 16px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; color: inherit; }
 .maxwell-attribution a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 .maxwell-attribution a:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }
+/* Above BB's dialogs; only the cat's square takes pointer input, even while
+   a modal dialog turns pointer events off for the rest of the page. */
+.maxwell-free { position: fixed; left: 0; top: 0; z-index: 2147483647; overflow: hidden; pointer-events: auto; }
+.maxwell-free canvas { display: block; width: 100%; height: 100%; }
+.maxwell-free canvas[hidden] { display: none; }
+.maxwell-free .maxwell-message { margin: 0; font-size: 12px; color: var(--foreground); background: var(--background); border-radius: 8px; }
