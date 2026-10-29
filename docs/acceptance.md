@@ -188,8 +188,10 @@ view from right to left. The dance must repeat after 903 ms and after 20 more
 periods, visibly lean to both sides, and keep the chest
 in view in every frame. The probe also observes the model-view matrices sent
 to WebGL. The model's head-to-tail direction must stay fixed while it rolls
-to both sides. Angles half a period apart must be equal and opposite, and
-its centre must stay fixed in all three dimensions. These are body-relative assertions, not
+to both sides. Angles half a period apart must be equal and opposite. The
+lowest transformed solid-body vertex must stay at the same floor height,
+without floating or penetrating it. The current contact vertex must also
+stay stationary over a 0.1 ms step, rejecting sliding. These are body-relative assertions, not
 screen-relative ones. It must also fit the frame. A change
 must start repeating its new motion within 250–700 ms. Consecutive frames,
 and frames taken either side of a new target in mid-change, must not jump.
@@ -206,7 +208,11 @@ for a symmetric sway in place instead, so only the reference's tempo is
 retained. The plugin keeps Maxwell facing the viewer, as the issue requires.
 
 The plugin uses roll around the model's local Z axis, which runs along its
-body, with a sinusoidal amplitude of ±0.2 radians and no translation or hop.
+body, with a sinusoidal amplitude of ±0.2 radians. The solid body's lower
+convex hull determines support on a fixed, invisible floor. Vertical
+correction prevents floating or penetration; integrating the support height
+over roll gives lateral motion without slipping, just as a carton pivots
+around its bottom edge. There is no independent hop or lateral animation.
 Both modes use the same camera framing, avoiding a zoom during transitions.
 Yaw and pitch oscillations are not part of the dance. The screen projection can change
 shape during a body-relative lean, so constant silhouette area is not an
@@ -299,6 +305,8 @@ pass, as do the six package and tool tests.
 
 ### Symmetric sway in place
 
+This intermediate correction was superseded by the grounded rocking below.
+
 The user removed the asymmetric hop and lateral displacement from the
 requirements. The dance now uses a single sine wave, ±0.2 radians around
 the same body axis, with the 903 ms period unchanged. Its centre stays at
@@ -311,3 +319,25 @@ the previous choreography with "The dancing cat must stay in place, without
 sideways movement or hopping", then passes with the new sway, including
 with music and in an empty chat. The two extreme poses must also differ in
 rendered pixels. Build, typecheck and the six package/tool tests pass.
+
+### Grounded rocking
+
+The user clarified the intended motion with a milk carton rocked on a
+table: the body must always touch the floor. A fixed model centre was the
+wrong constraint, so the test now checks the contact instead. The floor is
+virtual; no visible plane was added to the panel.
+
+`grounding.ts` uses solid-body vertices, not transparent whisker planes.
+It finds the supporting part of the lower cross-section at each roll angle
+and integrates its height exactly between changes of support. The centre
+therefore follows the supporting edge without sliding. Angular symmetry,
+±0.2 radians, the 903 ms tempo and smooth mode changes remain unchanged.
+
+The new browser floor-contact assertion fails on the fixed-centre version
+and passes on the grounded version, including music and empty chats. The
+same check verifies no-slip contact as well as rendered motion, framing,
+body-relative roll and angular symmetry. A separate box calculation checked
+401 angles and kept the selected bottom edge fixed to within 1e-12 model
+units. Build, typecheck and the six package/tool tests pass.
+The additional browser checks for the selected chat, free-cat transitions
+and the 24–120 rpm rotation scale all pass together.

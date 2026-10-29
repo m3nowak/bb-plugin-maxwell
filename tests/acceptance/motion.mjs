@@ -1,7 +1,15 @@
 // Observing Obrót and Taniec Maxwella in rendered pixels, and supplying known
 // context readings at BB's public thread routes.
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import { contentBounds, difference, sample } from './images.mjs';
+
+// Use the shipped body vertices, excluding the transparent whisker planes.
+const model = JSON.parse(await readFile(new URL('../../assets/maxwell.json', import.meta.url), 'utf8'));
+const positions = model.geometry.data.attributes.position.array;
+const body = model.geometry.data.groups.filter((group) => group.materialIndex === 0).flatMap(({ start, count }) =>
+  Array.from({ length: count }, (_, index) => positions.slice((start + index) * 3, (start + index) * 3 + 3)));
+const transformPoint = (matrix, point) => [0, 1, 2].map((row) => matrix[row] * point[0] + matrix[4 + row] * point[1] + matrix[8 + row] * point[2] + matrix[12 + row]);
 
 /** One sway right and back from the left, measured from the reference video. */
 export const DANCE_PERIOD = 903;
@@ -129,12 +137,12 @@ export async function assertDancing(page, where = '') {
   const forward = axis(transforms[0], 2);
   const side = axis(transforms[0], 0);
   const up = axis(transforms[0], 1);
-  const origin = axis(transforms[0], 3);
+  const floor = Math.min(...body.map((point) => dot(transformPoint(transforms[0], point), up)));
   const rolls = [];
   for (const matrix of transforms) {
     assert.ok(Math.hypot(...axis(matrix, 2).map((value, i) => value - forward[i])) < 1e-5, `The cat must roll about its own head-to-tail axis, not the viewer's axis ${where}`);
-    const delta = axis(matrix, 3).map((value, i) => value - origin[i]);
-    assert.ok(Math.hypot(...delta) < 1e-5, `The dancing cat must stay in place, without sideways movement or hopping ${where}`);
+    const bottom = Math.min(...body.map((point) => dot(transformPoint(matrix, point), up)));
+    assert.ok(Math.abs(bottom - floor) < 1e-5, `The body must touch the same floor throughout the sway, without floating or penetrating it ${where}`);
     rolls.push(Math.atan2(dot(axis(matrix, 1), side), dot(axis(matrix, 1), up)));
   }
   assert.ok(Math.min(...rolls) < -0.1 && Math.max(...rolls) > 0.1, `The body must lean to both sides ${where}`);
@@ -142,6 +150,20 @@ export async function assertDancing(page, where = '') {
     assert.ok(Math.abs(rolls[index] + rolls[index + 12]) < 1e-5, `Both halves of the sway must mirror each other ${where}`);
   }
   assert.ok(difference(images[6], images[18]) > 1, `Both sides of the sway must be visibly different ${where}`);
+  // A milk carton rocks about its supporting edge instead of sliding over
+  // the table. Track the current contact vertex across a very short step.
+  const epsilon = 0.1;
+  const startContact = mod(-await sceneTime(page), DANCE_PERIOD);
+  for (let index = 0; index < 24; index++) {
+    await sample(page, index ? DANCE_PERIOD / 24 - epsilon : startContact);
+    const before = await page.evaluate(() => window.maxwellBrowserProbe.modelView());
+    await sample(page, epsilon);
+    const after = await page.evaluate(() => window.maxwellBrowserProbe.modelView());
+    const height = (point) => dot(transformPoint(before, point), up) + dot(transformPoint(after, point), up);
+    const contact = body.reduce((lowest, point) => height(point) < height(lowest) ? point : lowest);
+    const a = transformPoint(before, contact), b = transformPoint(after, contact);
+    assert.ok(Math.hypot(...a.map((value, i) => b[i] - value)) < 1e-5, `The supporting part of the body must stay on the floor instead of sliding ${where}`);
+  }
   return images;
 }
 

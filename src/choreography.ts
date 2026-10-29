@@ -17,8 +17,8 @@ const BOB = 0.105;
 /** Revolution at which Maxwell looks into the camera. */
 const FRONT = 0.6;
 
-/** Equal lean to either side of the body, in radians. The dance stays in place. */
-const DANCE_ROLL = 0.2;
+/** Equal lean to either side of the body, in radians. */
+export const DANCE_ROLL = 0.2;
 
 const smooth = (u: number) => u <= 0 ? 0 : u >= 1 ? 1 : u * u * (3 - 2 * u);
 /** The integral of smooth from 0 to u. */

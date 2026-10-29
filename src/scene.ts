@@ -4,7 +4,8 @@ import {
   Texture, Vector2, WebGLRenderer,
 } from 'three';
 import model from '../assets/maxwell.json';
-import { choreograph } from './choreography';
+import { choreograph, DANCE_ROLL } from './choreography';
+import { createRockingSupport } from './grounding';
 import type { MaxwellMotion } from './motion';
 
 const ELEVATION = 14 * Math.PI / 180;
@@ -54,6 +55,7 @@ export function mountMaxwellScene(
   const textures: Texture[] = [];
   const materials: MeshLambertMaterial[] = [];
   let geometry: ReturnType<BufferGeometryLoader['parse']> | undefined;
+  let support: ReturnType<typeof createRockingSupport> | undefined;
   let disposed = false;
   let ready = false;
   let inView = false;
@@ -72,10 +74,12 @@ export function mountMaxwellScene(
     if (!running) return;
     const elapsed = previousTime === null ? 0 : time - previousTime;
     const pose = motion.advance(elapsed);
+    const grounded = support!.at(pose.roll);
     cat.rotation.set(0, pose.yaw, pose.roll);
-    cat.position.set(0, pose.y * radius, 0);
-    if (pose.reach !== reach) {
-      reach = pose.reach;
+    cat.position.set(Math.cos(pose.yaw) * grounded.x, pose.y * radius + grounded.y, -Math.sin(pose.yaw) * grounded.x);
+    const framing = Math.max(pose.reach, support!.reach / radius);
+    if (framing !== reach) {
+      reach = framing;
       frameCamera();
     }
     if (previousTime !== null) onFrame?.(elapsed);
@@ -99,7 +103,7 @@ export function mountMaxwellScene(
     if (width === 0 || height === 0) return;
     camera.aspect = width / height;
     // A sphere enclosing every vertex also encloses every angle of rotation
-    // and tilt, including whiskers. Reserve room for the rotation's bob in
+    // and tilt, including whiskers. Reserve room for the bob and grounding in
     // both modes so the camera stays still. Use the narrower field of view.
     const framed = radius * (1 + reach);
     const halfFov = Math.min(FOV * Math.PI / 360, Math.atan(Math.tan(FOV * Math.PI / 360) * camera.aspect));
@@ -184,6 +188,16 @@ export function mountMaxwellScene(
       geometry = new BufferGeometryLoader().parse(model.geometry);
       geometry.computeBoundingSphere();
       radius = geometry.boundingSphere!.radius;
+      const positions = geometry.getAttribute('position');
+      const body: { x: number; y: number }[] = [];
+      for (const { start, count, materialIndex } of geometry.groups) {
+        if (materialIndex !== 0) continue;
+        for (let i = start; i < start + count; i++) {
+          const vertex = geometry.index ? geometry.index.getX(i) : i;
+          body.push({ x: positions.getX(vertex), y: positions.getY(vertex) });
+        }
+      }
+      support = createRockingSupport(body, DANCE_ROLL);
       const images = await Promise.all([model.body, model.whiskers].map(async (url) => {
         const image = new Image();
         image.src = url;
