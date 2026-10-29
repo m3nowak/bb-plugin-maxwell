@@ -14,8 +14,9 @@ default SwiftShader flags, for example with
 `--no-sandbox --use-angle=gl-egl --ignore-gpu-blocklist` for a hardware GPU.
 
 The suite covers locally bundled assets, missing WebGL, invalid image data,
-context loss, attribution retention, 24 rpm rotation and vertical motion at 20 cycles per minute under both
-motion preferences, framing, theme changes, hidden views and repeated closing.
+context loss, attribution retention, rotation with its vertical bob at 20
+cycles per minute under both motion preferences, the dance, framing, theme
+changes, hidden views and repeated closing.
 Rendering tests fail on unusable graphics hardware, rather than skipping.
 
 Music checks observe the browser media boundary: `playing` events, advancing
@@ -74,31 +75,10 @@ rendered-motion check still cannot reach a visible scene on this host.
 
 ## Rotation speed tool (issue #3)
 
-`tool.test.mjs` covers the agent tool contract at the SDK host boundary: one
-registered setter exposed without selection rules, the saved rpm returned
-unrounded for 0, 0.5, 240.25 and extreme finite values, the 24 rpm default,
-rejection of missing, negative, non-numeric, non-finite and thread-targeting
-input without a state change, a missing thread identity, an injected save
-failure, thread sharing and isolation, competing saves converging on the last
-saved value and revision, and retention across a plugin reload.
-
-BB's live tool route accepts only authenticated host daemon sessions, so the
-browser suite cannot call the tool directly. One manual live check in BB
-0.47.1 asked a Claude Code agent in a scratch thread to call the installed
-tool with 0.5 rpm. The tool returned `{"rpm":0.5}`, the thread's saved speed
-became 0.5, a browser viewing that thread's panel received the update on the
-thread's channel and a second client viewing another thread kept 24 rpm.
-
-Not verified here:
-
-- Rendered speed: 0.5 rpm taking two minutes per revolution, 60 rpm after
-  opening a panel, angle retention on change, zero rpm with bobbing, and
-  extreme speeds. The rendering limitation above still applies.
-- An actual BB restart and an agent-session reset. Speed is keyed only by
-  thread in BB's plugin storage, and reload retention is tested.
-- Two browser clients converging on competing live changes. The panel keeps
-  the highest revision from its read and from realtime signals, and rereads
-  after every reconnection.
+Removed by [issue #9](https://github.com/m3nowak/bb-plugin-maxwell/issues/9):
+the speed now follows the viewed chat's context, as recorded in
+[ADR 0004](adr/0004-context-driven-maxwell-motion.md). `tool.test.mjs` checks
+that the setter is gone and that speeds saved by earlier versions are not read.
 
 ## Music verification (issue #5)
 
@@ -162,8 +142,8 @@ The browser checks cover:
   thread.
 - Diagonal flight at a constant pace, edge-only reversals on both axes,
   unchanged images across bounces, and resizing down to 240×180.
-- Speed from the route's thread, the focused split pane, live changes, and
-  24 rpm on New thread. At 0 rpm the cat still bobs and flies.
+- Motion from the route's chat and the focused split pane, and the dance on
+  New thread and in settings (see issue #9 below).
 - Clicks on the cat, not its empty square, playing music. Playback continues
   across free, capture and repeated free. Free after a reload stays silent.
 - The cat above BB's Ctrl+K dialog, with the dialog keeping the pointer
@@ -189,3 +169,105 @@ checks fail identically against `main` on the same BB.
 A real Claude Code or Codex agent did not call the tools. The scripted agent
 reached them through BB's provider path, and both appeared in its session's
 tool list with their descriptions.
+
+## Context-driven motion and the dance (issue #9)
+
+`motion.test.mjs` and the two motion tests in `free.test.mjs` supply known
+context readings at BB's public thread routes. Playwright answers
+`/api/v1/threads/:id/context` with a chosen reading, a failure or a delayed
+reply, and `/conversation-outline` with no messages for an empty thread.
+Thread changes come from real driver turns (`bb thread tell`) and a real
+`bb thread clear`. The motion is measured in rendered pixels with frames held
+by the probe, which also reports each scene's clock from its first drawn frame.
+
+A speed is accepted only when one and twenty whole turns return the same
+image and 1/2, 1/3, 1/4 and 1/5 of a turn do not. Twenty turns expose an
+error of about 1%, such as rounding to whole percents. Both images are taken
+where the three-second bob is at the same height. The chest's light pixels must cross the
+view from right to left. The dance must repeat after 903 ms and after 20 more
+periods, sway right and then left by over a quarter of the cat's width, and
+keep the chest in view in every frame. It must also fit the frame. A change
+must start repeating its new motion within 250–700 ms. Consecutive frames,
+and frames taken either side of a new target in mid-change, must not jump.
+Turning to face the viewer, from 24 or 120 rpm, must not change the image
+between frames much more than a full context's rotation does.
+
+The dance period was measured from the swaying parts of the
+[reference video](https://www.youtube.com/watch?v=rXh8Hvo7gfs) (0–3.6 s and
+7.2–14.5 s at 24 fps). The cat's horizontal centre was fitted against
+candidate periods: 0.9055 s over the first part and 0.9030 s over the longer
+second part. One sway to the right and back from the left takes 903 ms. Its
+shape was read from the same frames: a short rest, a quick move, a hold and
+a return in each half. One half is a hop up and to the right, about a quarter
+of the cat's width across and two fifths of its height up; the other is a lean
+down to the left. The reference shows Maxwell in three-quarter view; the
+plugin keeps him facing the viewer, as the issue requires.
+
+The dance test writes one period of frames to `artifacts/dance-*.png`, and
+the speed test writes quarter turns to `artifacts/rotation-*.png`. Compare
+the dance frames in order with one period of the reference's swaying part.
+
+The checks cover:
+
+- 24, 48, 72, 96 and 120 rpm at 0, 25, 50, 75 and 100% of the window, 54 rpm
+  at 31.25% of a 128k window, and 120 rpm beyond the window. 24 rpm and its
+  direction are also checked with reduced motion.
+- A failed read before any reading (24 rpm). After a valid reading, a failed
+  read, no usage, negative tokens, a zero, negative or non-numeric window
+  keep 72 rpm. A valid empty reading gives 24 rpm.
+- A new reading in the middle of a speed change, which keeps the speed
+  continuous and settles at the new reading.
+- A drop after compaction, the same tokens in a smaller model window, and a
+  clear. A read sent before the clear and answered after it is discarded,
+  leaving 24 rpm until a new reading.
+- Separate chats, a child agent's own chat, returning to a chat whose reads now
+  fail (its last reading in the tab applies), a late reply for the chat just
+  left, a second tab, and a reload.
+- A missed change read again after the realtime socket reconnects.
+- The dance on New thread, in an empty thread and with music playing, then
+  rotation once the first message is sent and while the agent waits.
+- The free cat following the route's chat, the focused split pane and
+  settings, with one scene throughout. Its flight keeps its pace while the
+  motion changes, and rapid navigation does not jump.
+
+BB 0.48 shows one side panel in split view, so two Maxwell panels cannot be
+placed side by side. A panel follows the thread its tab belongs to.
+
+`tool.test.mjs` checks that `maxwell_set_rotation_speed` is no longer
+registered and that no RPC serves the speeds earlier versions saved,
+including 0 and 240.25 rpm.
+
+### Verification in this checkout
+
+BB 0.48.0 and Plugin SDK 0.6.79 ran in a dedicated instance with the driver
+agent, with Chromium headless shell 1248 using hardware ANGLE
+(`--no-sandbox --use-angle=gl-egl --ignore-gpu-blocklist`). Build and
+typecheck pass. The full suite ran 37 tests: 34 passed and 3 failed. All
+motion, free, music, failure-rendering and tool tests pass.
+
+The three failures are not caused by this change:
+
+- `lifecycle.test.mjs:27` and the existing-thread check's missing "Ask
+  anything." composer (`panel.test.mjs:91`) are the failures recorded for
+  issue #7.
+- The attribution link check (`failures.test.mjs:78`) now opens a popup with
+  no URL. It fails the same way when `main` is installed on the same BB
+  0.48.0, which suggests BB's link handling changed since 0.47.1.
+
+The dance frames from `artifacts/dance-*.png` were compared in order with the
+same phase of the reference's swaying part. The rest, hop, hold, return and
+lean fall on the same frames of the period.
+
+Turning to face the viewer was simulated separately for 5,000 random speeds,
+angles and earlier changes. It never turned back, always ended facing the
+camera, and took 0.4–0.7 s, peaking at 145 rpm only when entered from close
+to 120 rpm. The browser checks bound its frame-to-frame change by that of a
+full context.
+
+Not verified here:
+
+- Compaction and model changes made by a real provider. The driver agent
+  does not support manual compaction (BB answers HTTP 409), so a compaction
+  is a lower reading after a turn, and a model change a different window.
+- Context readings reported by a real Claude Code or Codex agent.
+- Two Maxwell panels side by side, which BB 0.48 does not offer.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { closeMaxwell, openBB, openMaxwell, baseURL } from './harness.mjs';
+import { CAT, closeMaxwell, openBB, openMaxwell, baseURL } from './harness.mjs';
 import { freeze, pointOn, sample } from './images.mjs';
 import { assertContinuous, assertSilent, audio, clickCat, DURATION, MUSIC, position, ready, waitForStarts } from './audio.mjs';
 
@@ -100,7 +100,7 @@ test('one tab-wide recording survives panel closes, thread changes and rendering
     await clickCat(page, { times: 3 });
     previous = await assertContinuous(page, previous);
 
-    await page.getByRole('img', { name: 'Maxwell the cat rotating from right to left' })
+    await page.getByRole('img', { name: CAT })
       .evaluate((canvas) => canvas.getContext('webgl2').getExtension('WEBGL_lose_context').loseContext());
     await page.getByRole('alert').filter({ hasText: 'graphics device was reset' }).waitFor();
     previous = await assertContinuous(page, previous);

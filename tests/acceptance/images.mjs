@@ -1,4 +1,5 @@
 import { PNG } from 'pngjs';
+import { CAT } from './harness.mjs';
 export const decode = (dataURL) => PNG.sync.read(Buffer.from(dataURL.split(',')[1], 'base64'));
 export function difference(a, b) {
   let sum = 0;
@@ -34,7 +35,7 @@ export async function pointOn(page, image, { background = false } = {}) {
   candidates.sort((a, b) => Math.hypot(a.x - start.x, a.y - start.y) - Math.hypot(b.x - start.x, b.y - start.y));
   const pixel = candidates.find(({ x, y }) => solid(x, y, 5));
   if (!pixel) throw new Error(background ? 'No empty background is visible' : 'No solid cat pixel is visible');
-  const box = await page.getByRole('img', { name: 'Maxwell the cat rotating from right to left' }).boundingBox();
+  const box = await page.getByRole('img', { name: CAT }).boundingBox();
   return { x: box.x + (pixel.x + 0.5) * box.width / image.width, y: box.y + (pixel.y + 0.5) * box.height / image.height };
 }
 export async function freeze(page) {

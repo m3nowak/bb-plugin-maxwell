@@ -4,6 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { promisify } from 'node:util';
 
 export const baseURL = process.env.MAXWELL_BB_URL ?? process.env.BB_SERVER_URL ?? 'http://127.0.0.1:38888';
+/** The cat's canvas names what Maxwell is doing: rotating in a chat, dancing outside one. */
+export const CAT = /^Maxwell the cat (rotating from right to left|dancing)$/;
+export const ROTATING = 'Maxwell the cat rotating from right to left';
+export const DANCING = 'Maxwell the cat dancing';
+export const CAT_CANVAS = 'canvas[aria-label^="Maxwell the cat"]';
 export async function openBB(options = {}) {
   const browser = await chromium.launch({
     executablePath: process.env.MAXWELL_CHROME,
@@ -34,7 +39,7 @@ export async function openMaxwell(page, { expectRendering = true } = {}) {
   await page.getByRole('button', { name: 'maxwell', exact: true })
     .and(page.getByTitle('maxwell', { exact: true })).click();
   await page.getByRole('region', { name: 'maxwell', exact: true }).waitFor();
-  if (expectRendering) await page.getByRole('img', { name: 'Maxwell the cat rotating from right to left' }).waitFor();
+  if (expectRendering) await page.getByRole('img', { name: CAT }).waitFor();
 }
 
 export async function closeMaxwell(page) {
